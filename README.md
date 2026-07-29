@@ -3,23 +3,51 @@
 A Zelda-style top-down control room for Claude Code agents. Real agents
 appear as NPCs in a village; you walk up to them, talk to steer them,
 interrupt them with a sword-tap, and watch their context window as a
-health bar. See [DESIGN.md](./DESIGN.md) for the full vision — this repo
-currently implements **Phase 1 (core loop)**.
+health bar. See [DESIGN.md](./DESIGN.md) for the full vision — all four
+implementation phases are built.
 
-## What works today (Phase 1)
+## What works
 
-- **Village + movement** — WASD/arrows, camera follow (§1)
-- **Portal summon** — walk to the portal, press `E`, describe the quest,
-  pick a model (equipment) and permission gate (§8)
-- **Real agents as NPCs** — each summon starts a genuine Claude Code
-  session via the Claude Agent SDK; the NPC animates by status: thinking,
-  swinging a tool, blocked on permission, asleep, fainting into an
-  auto-compact (§2, §3)
-- **NPC health = context window**, restored on auto-compaction (§2)
-- **Player hearts = shared budget** — every agent's spend chips your
-  hearts; at zero, agents fall asleep in place until you top up (§2)
-- **Control actions** — talk/steer, interrupt, resume, dismiss, and
-  allow/deny on permission requests (§7)
+**Phase 1 — core loop**
+- Village + movement (WASD/arrows), portal summon with model-as-equipment
+  and permission gate choice (§1, §8)
+- Real agents as NPCs via the Claude Agent SDK: status animations,
+  NPC health = context window (restored on auto-compaction), player
+  hearts = shared budget; at zero everyone sleeps in place (§2, §3)
+- Talk/steer, interrupt, resume, dismiss, allow/deny (§7)
+
+**Phase 2 — visibility depth**
+- The Mirror (`M`): live agent grid, attention pulse, tap to warp (§4)
+- Inventory: tools/skills/MCP items from the session init message,
+  used-this-session glow, model as an equipment slot with real
+  mid-session re-equip via `setModel()` (§5, §5a)
+- Quest log from TaskCreate/TaskUpdate (and legacy TodoWrite); journal
+  drawer (`J`) (§6); camp clustering past 6 NPCs with Mirror promotion (§12)
+
+**Phase 3 — a living world**
+- Repo-as-village: one labeled house per top-level directory; agents
+  visibly walk to the district they're touching (§1, §12)
+- Quest board: stale branches, TODO/FIXME bounties, README gaps scanned
+  from the repo; accepting prefills the portal (§9a, §9b)
+- Subagent lifecycle: minion dots, party badge past 3, scroll-flash on
+  return; backgrounded tasks burn as campfires (§13, §14)
+- Plan mode = draft quest log until ExitPlanMode; CLAUDE.md as a memory
+  tome in the inventory; Auto Mode gatekeeper NPC (§14)
+
+**Phase 4 — depth & delight**
+- Revive saved sessions from the portal (`listSessions` + `resume`) (§8a)
+- The Tavern: procedural bard, town crier reading recent commits,
+  library keyed to live activity, a garden (§9d)
+- The Scrying Pool: summons a real Haiku scout to web-search (§9e)
+- Easter eggs (§15) and the backtick cheat console: noclip, speed,
+  warp, reveal, debug, and god mode = real Auto Mode (§16)
+- Sandbox demo: `AGENT_QUEST_DEMO=1 npm run dev` — fake agents, fake
+  budget, full UI, zero spend
+
+**Known gaps (honest ones):** hooks-as-wards and the trophy rewind
+mechanic have no reliable SDK signal yet; live attach to a session
+running in another terminal (Remote Control) has no public API. All
+three are noted in DESIGN.md and wait on upstream support.
 
 ## Running it
 

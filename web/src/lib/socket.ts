@@ -4,8 +4,14 @@ import {
   appendJournalAtom,
   connectedAtom,
   defaultCwdAtom,
+  demoModeAtom,
+  districtsAtom,
   gameStore,
+  lastSteerAtom,
   playerAtom,
+  recentCommitsAtom,
+  savedSessionsAtom,
+  sideQuestsAtom,
   toastsAtom,
 } from "@/store/gameAtoms";
 
@@ -14,10 +20,21 @@ let toastSeq = 0;
 
 export function sendCommand(command: ClientCommand): void {
   if (socket?.readyState === WebSocket.OPEN) {
+    if (command.type === "steer") {
+      gameStore.set(lastSteerAtom, command.text); // §15 rubber duck
+    }
     socket.send(JSON.stringify(command));
   } else {
     pushToast("error", "Not connected to the control server.");
   }
+}
+
+/** Client-side toast, for in-world flavor that never touches the server. */
+export function localToast(
+  level: "info" | "warn" | "error",
+  text: string,
+): void {
+  pushToast(level, text);
 }
 
 function pushToast(level: "info" | "warn" | "error", text: string): void {
@@ -53,7 +70,14 @@ function handleEvent(event: ServerEvent): void {
     case "snapshot":
       safeSet(() => gameStore.set(playerAtom, event.player));
       safeSet(() => gameStore.set(defaultCwdAtom, event.defaultCwd));
+      safeSet(() => gameStore.set(districtsAtom, event.districts));
+      safeSet(() => gameStore.set(sideQuestsAtom, event.sideQuests));
+      safeSet(() => gameStore.set(recentCommitsAtom, event.recentCommits));
+      safeSet(() => gameStore.set(demoModeAtom, event.demoMode));
       safeSet(() => gameStore.set(agentsAtom, event.agents));
+      break;
+    case "sessions":
+      safeSet(() => gameStore.set(savedSessionsAtom, event.sessions));
       break;
     case "journal":
       safeSet(() => gameStore.set(appendJournalAtom, event.line));

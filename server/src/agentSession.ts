@@ -10,6 +10,7 @@ import {
   type AgentInventory,
   type AgentSnapshot,
   type AgentStatus,
+  type AgentTask,
   contextLimitFor,
   type JournalKind,
   type PendingPermission,
@@ -18,6 +19,7 @@ import {
   type ToolUseStat,
 } from "../../shared/protocol";
 import { MonotonicCounter } from "./budget";
+import { districtOf, readTome } from "./repo";
 
 export interface SessionEvents {
   /** Snapshot state changed — schedule a broadcast. */
@@ -34,6 +36,14 @@ export interface SpawnSpec {
   cwd: string;
   model: string;
   permissionMode: PermissionMode;
+  /** §8a — resume a saved session instead of starting fresh. */
+  resume?: string;
+}
+
+/** World context shared by all sessions: the repo the village maps (§1). */
+export interface WorldContext {
+  repoRoot: string;
+  districts: string[];
 }
 
 /**
@@ -217,6 +227,12 @@ export class AgentSession {
   private toolUses: Record<string, ToolUseStat> = {};
   private quests: Quest[] = [];
   private questTracker = new QuestTracker();
+  private district: string | null = null;
+  private permissionMode: PermissionMode;
+  private planPending: boolean;
+  private tomePreview: string | null;
+  private tasks = new Map<string, AgentTask>();
+  private streak = { tool: "", count: 0 };
 
   private queue = new InputQueue();
   private q: Query | null = null;
@@ -228,6 +244,7 @@ export class AgentSession {
 
   constructor(
     spec: SpawnSpec,
+    private world: WorldContext,
     private events: SessionEvents,
   ) {
     this.id = spec.id;
@@ -236,6 +253,9 @@ export class AgentSession {
     this.cwd = spec.cwd;
     this.model = spec.model;
     this.contextLimit = contextLimitFor(spec.model);
+    this.permissionMode = spec.permissionMode;
+    this.planPending = spec.permissionMode === "plan";
+    this.tomePreview = readTome(spec.cwd);
 
     this.q = query({
       prompt: this.queue,
@@ -243,6 +263,7 @@ export class AgentSession {
         cwd: spec.cwd,
         model: spec.model,
         permissionMode: spec.permissionMode,
+        resume: spec.resume,
         canUseTool: (toolName, input, options) =>
           this.requestPermission(toolName, input, options.title),
         settingSources: ["user", "project", "local"],
@@ -278,6 +299,11 @@ export class AgentSession {
       inventory: this.inventory,
       toolUses: this.toolUses,
       quests: this.quests,
+      district: this.district,
+      permissionMode: this.permissionMode,
+      planPending: this.planPending,
+      tomePreview: this.tomePreview,
+      tasks: [...this.tasks.values()],
     };
   }
 
@@ -316,6 +342,24 @@ export class AgentSession {
   resume(text?: string): void {
     if (this.ended) return;
     this.steer(text ?? "Please continue where you left off.");
+  }
+
+  /** §16 god mode — hand the gate to the classifier (or take it back). */
+  async setPermissionMode(mode: PermissionMode): Promise<void> {
+    if (this.ended || !this.q) return;
+    try {
+      await this.q.setPermissionMode(mode);
+      this.permissionMode = mode;
+      this.events.onJournal(
+        "status",
+        mode === "auto"
+          ? "the gatekeeper stops looking to you before deciding"
+          : `permission mode set to ${mode}`,
+      );
+      this.events.onChange();
+    } catch (error) {
+      this.events.onJournal("error", `mode change failed: ${String(error)}`);
+    }
   }
 
   /** §5a — swap the model mid-session: a real re-equip via the SDK. */
@@ -407,6 +451,16 @@ export class AgentSession {
     });
   }
 
+  /** Keep finished tasks visible briefly, but don't grow forever. */
+  private pruneTasks(): void {
+    const finished = [...this.tasks.values()].filter(
+      (task) => task.status !== "running",
+    );
+    for (const task of finished.slice(0, Math.max(0, finished.length - 6))) {
+      this.tasks.delete(task.id);
+    }
+  }
+
   private setStatus(status: AgentStatus, thought?: string): void {
     this.status = status;
     if (thought !== undefined) this.thought = thought;
@@ -453,6 +507,56 @@ export class AgentSession {
             "status",
             `session ${message.session_id.slice(0, 8)} started (${message.model}, ${message.tools.length} tools)`,
           );
+        } else if (message.subtype === "task_started") {
+          // §13/§14 — a subagent heads into the field, or a campfire is lit.
+          const kind = message.subagent_type ? "subagent" : "background";
+          this.tasks.set(message.task_id, {
+            id: message.task_id,
+            description: truncate(message.description, 80),
+            kind,
+            status: "running",
+          });
+          this.events.onJournal(
+            "status",
+            kind === "subagent"
+              ? `⚔ subagent sets out: ${truncate(message.description, 80)}`
+              : `🔥 campfire lit: ${truncate(message.description, 80)}`,
+          );
+          this.events.onChange();
+        } else if (message.subtype === "task_notification") {
+          // §13 — the subagent returns and hands over its scroll.
+          const task = this.tasks.get(message.task_id);
+          if (task) {
+            task.status = message.status;
+            this.events.onJournal(
+              message.status === "failed" ? "error" : "status",
+              `📜 ${task.kind} ${message.status}: ${truncate(message.summary, 120)}`,
+            );
+            this.pruneTasks();
+            this.events.onChange();
+          }
+        } else if (message.subtype === "background_tasks_changed") {
+          // REPLACE semantics: this payload is the full set of live campfires.
+          for (const [id, task] of this.tasks) {
+            if (task.kind === "background" && task.status === "running") {
+              this.tasks.delete(id);
+            }
+          }
+          for (const live of message.tasks) {
+            this.tasks.set(live.task_id, {
+              id: live.task_id,
+              description: truncate(live.description, 80),
+              kind: "background",
+              status: "running",
+            });
+          }
+          this.events.onChange();
+        } else if (message.subtype === "permission_denied") {
+          // §14 auto mode: the gatekeeper turned someone away on its own.
+          this.events.onJournal(
+            "permission",
+            `🛡 gatekeeper denied ${message.tool_name}`,
+          );
         } else if (message.subtype === "compact_boundary") {
           // §2: faint → auto-compact → back up, health restored to the
           // post-compaction context size.
@@ -488,6 +592,38 @@ export class AgentSession {
             };
             if (this.questTracker.handleToolUse(block.name, input)) {
               this.quests = this.questTracker.list();
+            }
+            // §14: accepting the plan signs the draft quest log.
+            if (block.name === "ExitPlanMode" && this.planPending) {
+              this.planPending = false;
+              this.events.onJournal("status", "quest accepted — plan signed");
+            }
+            // §1: touching a file moves the NPC into that district.
+            const touched = ["file_path", "path", "notebook_path"]
+              .map((key) => input[key])
+              .find((value): value is string => typeof value === "string");
+            if (touched) {
+              const district = districtOf(
+                touched,
+                this.world.repoRoot,
+                this.world.districts,
+              );
+              if (district && district !== this.district) {
+                this.district = district;
+                this.events.onJournal("status", `entered ${district}/`);
+              }
+            }
+            // §15: an unusually long unbroken streak of the same tool.
+            if (block.name === this.streak.tool) {
+              this.streak.count += 1;
+              if (this.streak.count === 8) {
+                this.setStatus(
+                  this.status,
+                  `…are you okay? (${block.name} ×8)`,
+                );
+              }
+            } else {
+              this.streak = { tool: block.name, count: 1 };
             }
             this.outstandingTools.set(
               block.id,

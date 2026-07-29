@@ -13,7 +13,8 @@ export type AgentStatus =
   | "ended" // dismissed or finished for good
   | "error";
 
-export type PermissionMode = "default" | "acceptEdits" | "plan";
+// "auto" = the gatekeeper (safety classifier) decides instead of you (§14/§16)
+export type PermissionMode = "default" | "acceptEdits" | "plan" | "auto";
 
 export interface PendingPermission {
   requestId: string;
@@ -40,6 +41,33 @@ export interface ToolUseStat {
 export interface Quest {
   title: string;
   status: "pending" | "in_progress" | "completed";
+}
+
+/** §13/§14 — a subagent (walks the fields) or backgrounded task (campfire). */
+export interface AgentTask {
+  id: string;
+  description: string;
+  kind: "subagent" | "background";
+  status: "running" | "completed" | "failed" | "stopped";
+}
+
+/** §9a/§9b — a side quest posted on the village board, scanned from the repo. */
+export interface SideQuest {
+  id: string;
+  kind: "weeds" | "bounty" | "docs";
+  icon: string;
+  title: string;
+  detail: string;
+  /** Prefills the portal when the quest is accepted. */
+  suggestedTask: string;
+}
+
+/** §8a — a saved Claude Code session that can be resumed as an NPC. */
+export interface SessionSummary {
+  sessionId: string;
+  summary: string;
+  lastModified: number;
+  cwd: string | null;
 }
 
 export interface AgentSnapshot {
@@ -71,6 +99,15 @@ export interface AgentSnapshot {
   toolUses: Record<string, ToolUseStat>;
   /** §6 quest log, from the agent's todo list. */
   quests: Quest[];
+  /** §1/§12 — top-level directory the agent last touched (its district). */
+  district: string | null;
+  permissionMode: PermissionMode;
+  /** §14 plan mode: true while the plan is still a draft (unsigned quest). */
+  planPending: boolean;
+  /** §14 memory tome: the project's CLAUDE.md, if one exists. */
+  tomePreview: string | null;
+  /** §13/§14 — live subagents and backgrounded tasks. */
+  tasks: AgentTask[];
 }
 
 export interface PlayerState {
@@ -103,21 +140,35 @@ export type ServerEvent =
       type: "snapshot";
       agents: AgentSnapshot[];
       player: PlayerState;
-      /** Where the control server is running — prefills the portal's cwd. */
+      /** Repo root the village maps (§1) — also prefills the portal's cwd. */
       defaultCwd: string;
+      /** §1/§12 — top-level directories of the repo, one house each. */
+      districts: string[];
+      /** §9a — what's posted on the quest board right now. */
+      sideQuests: SideQuest[];
+      /** §9d town crier — recent commits, read aloud in the tavern. */
+      recentCommits: string[];
+      /** True when the server runs on a fake budget with fake agents (§16). */
+      demoMode: boolean;
     }
   | { type: "journal"; line: JournalLine }
-  | { type: "toast"; level: "info" | "warn" | "error"; text: string };
+  | { type: "toast"; level: "info" | "warn" | "error"; text: string }
+  | { type: "sessions"; sessions: SessionSummary[] };
 
 export type ClientCommand =
-  // §8 portal summon
+  // §8 portal summon; `resume` revives a saved session as the NPC (§8a)
   | {
       type: "summon";
       task: string;
       cwd: string;
       model?: string;
       permissionMode?: PermissionMode;
+      resume?: string;
     }
+  // §8a — ask for the list of saved sessions that can be resumed
+  | { type: "listSessions" }
+  // §16 god mode — hand every gate to the safety classifier (Auto Mode)
+  | { type: "autoMode"; enabled: boolean }
   // §7 wand/talk — inject an instruction mid-task
   | { type: "steer"; agentId: string; text: string }
   // §7 sword — halt the current turn, no data loss

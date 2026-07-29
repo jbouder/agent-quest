@@ -1,5 +1,11 @@
 import { atom, createStore } from "jotai";
-import type { AgentSnapshot, JournalLine, PlayerState } from "@/lib/protocol";
+import type {
+  AgentSnapshot,
+  JournalLine,
+  PlayerState,
+  SessionSummary,
+  SideQuest,
+} from "@/lib/protocol";
 
 /** Shared store so the Phaser scene (outside React) can read/subscribe too. */
 export const gameStore = createStore();
@@ -22,6 +28,40 @@ export const playerAtom = atom<PlayerState>({
 export const defaultCwdAtom = atom<string>("");
 
 export const connectedAtom = atom<boolean>(false);
+
+/** §1/§12 — the repo's top-level directories, one house each. */
+export const districtsAtom = atom<string[]>([]);
+
+/** §9a — what's posted on the quest board. */
+export const sideQuestsAtom = atom<SideQuest[]>([]);
+
+/** §9d town crier — recent commits. */
+export const recentCommitsAtom = atom<string[]>([]);
+
+/** §16 sandbox — the server is running fake agents on fake budget. */
+export const demoModeAtom = atom<boolean>(false);
+
+/** §8a — saved sessions offered for resume at the portal. */
+export const savedSessionsAtom = atom<SessionSummary[]>([]);
+
+/** Prefills the portal's quest box (used by the quest board's Accept). */
+export const summonPrefillAtom = atom<string>("");
+
+/** §15 rubber duck — your last steering instruction, repeated back. */
+export const lastSteerAtom = atom<string>("");
+
+// §16 cheats
+export const noclipAtom = atom<boolean>(false);
+export const speedBoostAtom = atom<boolean>(false);
+export const debugOverlayAtom = atom<boolean>(false);
+export const revealMapAtom = atom<boolean>(false);
+/** Cheat "level select": a place name the scene should teleport to. */
+export const cheatWarpAtom = atom<string | null>(null);
+/** §15 old man's gift — cosmetic shield in the HUD. */
+export const shieldAtom = atom<boolean>(
+  typeof localStorage !== "undefined" &&
+    localStorage.getItem("aq-shield") === "1",
+);
 
 const JOURNAL_CAP = 500;
 export const journalAtom = atom<JournalLine[]>([]);
@@ -48,7 +88,11 @@ export type UiMode =
   | { mode: "summon" }
   | { mode: "talk"; agentId: string }
   | { mode: "mirror" }
-  | { mode: "inventory"; agentId: string };
+  | { mode: "inventory"; agentId: string }
+  | { mode: "board" }
+  | { mode: "tavern" }
+  | { mode: "scry" }
+  | { mode: "cheat" };
 
 export const uiModeAtom = atom<UiMode>({ mode: "roam" });
 
@@ -57,6 +101,10 @@ export type Interactable =
   | { kind: "portal" }
   | { kind: "npc"; agentId: string }
   | { kind: "camp" }
+  | { kind: "board" }
+  | { kind: "tavern" }
+  | { kind: "scry" }
+  | { kind: "egg"; eggId: string }
   | null;
 
 export const nearbyAtom = atom<Interactable>(null);

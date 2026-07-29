@@ -93,7 +93,14 @@ export default function TalkDialog() {
 
         {agent.quests.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto rounded border border-border bg-background p-2 text-xs">
-            <p className="mb-1 text-muted">Quest log</p>
+            <p className="mb-1 text-muted">
+              Quest log
+              {agent.planPending && (
+                <span className="ml-2 text-primary">
+                  ✎ draft — the plan is unsigned (§ plan mode)
+                </span>
+              )}
+            </p>
             {agent.quests.map((quest) => (
               <p
                 key={quest.title}

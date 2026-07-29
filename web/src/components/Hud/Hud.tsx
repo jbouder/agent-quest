@@ -2,7 +2,12 @@ import { useAtomValue } from "jotai";
 import { formatTokens, formatUsd, heartsFor } from "@/lib/format";
 import { sendCommand } from "@/lib/socket";
 import { cn } from "@/lib/utils";
-import { connectedAtom, playerAtom } from "@/store/gameAtoms";
+import {
+  connectedAtom,
+  demoModeAtom,
+  playerAtom,
+  shieldAtom,
+} from "@/store/gameAtoms";
 
 function Heart({ fill }: { fill: number }) {
   return (
@@ -21,6 +26,8 @@ function Heart({ fill }: { fill: number }) {
 export default function Hud() {
   const player = useAtomValue(playerAtom);
   const connected = useAtomValue(connectedAtom);
+  const demoMode = useAtomValue(demoModeAtom);
+  const shield = useAtomValue(shieldAtom);
   const hearts = heartsFor(player.spentUsd, player.budgetUsd);
 
   return (
@@ -30,6 +37,12 @@ export default function Hud() {
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length row
           <Heart key={i} fill={fill} />
         ))}
+        {shield && <span className="ml-1 text-sm">🛡</span>}
+        {demoMode && (
+          <span className="ml-2 rounded bg-primary px-1.5 text-[10px] text-primary-foreground">
+            DEMO
+          </span>
+        )}
       </div>
       <div className="rounded border border-border bg-card/85 px-2 py-1 text-xs text-muted">
         {formatUsd(player.spentUsd)} / {formatUsd(player.budgetUsd)} ·{" "}

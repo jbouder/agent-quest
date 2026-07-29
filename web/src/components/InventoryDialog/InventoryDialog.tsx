@@ -170,6 +170,18 @@ export default function InventoryDialog() {
                 agent.inventory?.mcpServers.length ?? 0
               } MCP server(s) connected`}
         </p>
+
+        {/* §14 — the memory tome the NPC carries between summons */}
+        {agent.tomePreview && (
+          <div className="mt-2 rounded border border-border bg-background p-2">
+            <p className="mb-1 text-xs text-primary">
+              📕 Memory tome (CLAUDE.md)
+            </p>
+            <pre className="max-h-24 overflow-y-auto whitespace-pre-wrap text-[10px] leading-snug text-muted">
+              {agent.tomePreview}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -5,10 +5,11 @@ import { SessionManager } from "./sessionManager";
 
 const PORT = Number(process.env.AGENT_QUEST_PORT ?? 8787);
 const BUDGET_USD = Number(process.env.AGENT_QUEST_BUDGET_USD ?? 5);
+const DEMO_MODE = process.env.AGENT_QUEST_DEMO === "1";
 
-if (!process.env.ANTHROPIC_API_KEY) {
+if (!process.env.ANTHROPIC_API_KEY && !DEMO_MODE) {
   console.warn(
-    "⚠ ANTHROPIC_API_KEY is not set — summoning agents will fail until it is.",
+    "⚠ ANTHROPIC_API_KEY is not set — the SDK will fall back to this machine's Claude Code credentials if available.",
   );
 }
 
@@ -25,7 +26,10 @@ function broadcast(event: ServerEvent): void {
   }
 }
 
-const manager = new SessionManager(broadcast, BUDGET_USD);
+const manager = new SessionManager(broadcast, BUDGET_USD, DEMO_MODE);
+if (DEMO_MODE) {
+  console.log("🎪 demo mode: fake agents, fake budget, nothing is real");
+}
 
 wss.on("connection", (socket) => {
   console.log(`[ws] client connected (${wss.clients.size} total)`);

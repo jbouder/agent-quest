@@ -1,12 +1,20 @@
 import Phaser from "phaser";
 import { contextHealth } from "@/lib/format";
 import type { AgentSnapshot, AgentStatus } from "@/lib/protocol";
+import { localToast } from "@/lib/socket";
 import {
   agentsAtom,
+  cheatWarpAtom,
+  districtsAtom,
   gameStore,
   type Interactable,
   journalOpenAtom,
+  lastSteerAtom,
   nearbyAtom,
+  noclipAtom,
+  revealMapAtom,
+  shieldAtom,
+  speedBoostAtom,
   uiModeAtom,
   warpTargetAtom,
 } from "@/store/gameAtoms";
@@ -18,26 +26,48 @@ const WORLD_H = 960;
 const PLAZA = { x: 640, y: 430 };
 const PORTAL = { x: 640, y: 810 };
 const CAMP = { x: 985, y: 760 };
+const TAVERN = { x: 160, y: 640 };
+const TOWER = { x: 1150, y: 160 };
+const BOARD = { x: 810, y: 398 };
+const POND = { x: 200, y: 830 };
 const PLAYER_SPEED = 190;
 const INTERACT_RANGE = 64;
 
-const HOUSES = [
-  { x: 300, y: 260 },
-  { x: 640, y: 200 },
-  { x: 980, y: 260 },
-  { x: 300, y: 620 },
-  { x: 980, y: 620 },
+/** §1/§12 — where district houses stand, up to 8. */
+const DISTRICT_SPOTS = [
+  { x: 280, y: 210 },
+  { x: 560, y: 160 },
+  { x: 840, y: 200 },
+  { x: 1080, y: 320 },
+  { x: 180, y: 420 },
+  { x: 1120, y: 560 },
+  { x: 340, y: 640 },
+  { x: 900, y: 620 },
 ];
 
-/** Fixed standing spots for the pinned agents (§12). */
+/** Fixed idle spots for pinned agents, ringing the plaza (§12). */
 const SLOTS = [
-  ...HOUSES.map((house) => ({ x: house.x, y: house.y + 84 })),
-  { x: PLAZA.x + 120, y: PLAZA.y + 130 },
+  { x: 500, y: 350 },
+  { x: 780, y: 350 },
+  { x: 480, y: 520 },
+  { x: 800, y: 520 },
+  { x: 570, y: 590 },
+  { x: 710, y: 590 },
 ];
 
 function slotFor(index: number): { x: number; y: number } {
   return SLOTS[index % SLOTS.length] ?? PLAZA;
 }
+
+/** §15 Easter eggs — placed around the village. */
+const EGGS: { id: string; x: number; y: number }[] = [
+  { id: "duck", x: POND.x + 40, y: POND.y - 10 },
+  { id: "statue1", x: 80, y: 120 },
+  { id: "statue2", x: 140, y: 120 },
+  { id: "oldman", x: 1215, y: 430 },
+  { id: "skeleton", x: 1070, y: 800 },
+  { id: "wall", x: 60, y: 260 },
+];
 
 const STATUS_ICON: Record<AgentStatus, string> = {
   summoning: "✨",
@@ -59,14 +89,19 @@ function healthColor(pct: number): number {
 
 class NpcView {
   container: Phaser.GameObjects.Container;
+  readonly home: { x: number; y: number };
   private body: Phaser.GameObjects.Image;
   private nameText: Phaser.GameObjects.Text;
   private bubble: Phaser.GameObjects.Text;
   private statusIcon: Phaser.GameObjects.Text;
   private healthFill: Phaser.GameObjects.Rectangle;
+  private minions: Phaser.GameObjects.Arc[] = [];
+  private partyBadge: Phaser.GameObjects.Text;
+  private campfire: Phaser.GameObjects.Text;
   private statusTween: Phaser.Tweens.Tween | null = null;
   private lastStatus: AgentStatus | null = null;
   private lastTier: string | null = null;
+  private finishedTasks = 0;
   private endedHandled = false;
 
   constructor(
@@ -75,6 +110,7 @@ class NpcView {
     slot: { x: number; y: number },
     from: { x: number; y: number },
   ) {
+    this.home = slot;
     const tier = modelTier(agent.model);
     this.body = scene.add.image(0, 0, `npc-${tier}`).setOrigin(0.5, 1);
     this.nameText = scene.add
@@ -106,6 +142,20 @@ class NpcView {
         align: "center",
       })
       .setOrigin(0.5, 1);
+    this.partyBadge = scene.add
+      .text(-24, -14, "", {
+        fontFamily: "monospace",
+        fontSize: "9px",
+        color: "#1a1408",
+        backgroundColor: "#d4a017",
+        padding: { x: 2, y: 1 },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.campfire = scene.add
+      .text(24, -8, "🔥", { fontSize: "11px" })
+      .setOrigin(0.5)
+      .setVisible(false);
 
     this.container = scene.add.container(from.x, from.y, [
       this.body,
@@ -114,6 +164,8 @@ class NpcView {
       this.healthFill,
       this.statusIcon,
       this.bubble,
+      this.partyBadge,
+      this.campfire,
     ]);
     this.container.setDepth(10);
 
@@ -123,6 +175,24 @@ class NpcView {
       x: slot.x,
       y: slot.y,
       duration: 2200,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  get x(): number {
+    return this.container.x;
+  }
+  get y(): number {
+    return this.container.y;
+  }
+
+  /** §1: walk to a district house (or back home) when work moves there. */
+  walkTo(target: { x: number; y: number }): void {
+    this.scene.tweens.add({
+      targets: this.container,
+      x: target.x,
+      y: target.y,
+      duration: 1500,
       ease: "Sine.easeInOut",
     });
   }
@@ -140,13 +210,6 @@ class NpcView {
       ease: "Sine.easeInOut",
       onComplete: () => this.destroy(),
     });
-  }
-
-  get x(): number {
-    return this.container.x;
-  }
-  get y(): number {
-    return this.container.y;
   }
 
   update(agent: AgentSnapshot): void {
@@ -177,10 +240,72 @@ class NpcView {
     this.bubble.setVisible(thought.length > 0 && agent.status !== "ended");
     this.statusIcon.setText(STATUS_ICON[agent.status]);
 
+    this.updateTasks(agent);
+
     if (agent.status !== this.lastStatus) {
       this.applyStatus(agent.status);
       this.lastStatus = agent.status;
     }
+  }
+
+  /** §13/§14 — subagent minions, party badge, and campfires. */
+  private updateTasks(agent: AgentSnapshot): void {
+    const runningSubs = agent.tasks.filter(
+      (t) => t.kind === "subagent" && t.status === "running",
+    );
+    const showDots = runningSubs.length <= 3 ? runningSubs.length : 0;
+    while (this.minions.length < showDots) {
+      const offsets = [
+        { x: -24, y: -4 },
+        { x: 26, y: -2 },
+        { x: -30, y: 8 },
+      ];
+      const at = offsets[this.minions.length] ?? { x: 0, y: 10 };
+      const dot = this.scene.add.circle(at.x, at.y, 4, 0x9ec4f0);
+      this.container.add(dot);
+      this.minions.push(dot);
+    }
+    while (this.minions.length > showDots) {
+      this.minions.pop()?.destroy();
+    }
+    // §13 batch resolution: past a small threshold, one badge, not a crowd.
+    this.partyBadge.setVisible(runningSubs.length > 3);
+    if (runningSubs.length > 3) {
+      this.partyBadge.setText(`⚔×${runningSubs.length}`);
+    }
+
+    this.campfire.setVisible(
+      agent.tasks.some(
+        (t) => t.kind === "background" && t.status === "running",
+      ),
+    );
+
+    // §13 return, don't vanish: a scroll flash when work comes home.
+    const finished = agent.tasks.filter((t) => t.status !== "running").length;
+    if (finished > this.finishedTasks) {
+      const burst = finished - this.finishedTasks;
+      const scroll = this.scene.add
+        .text(
+          this.container.x,
+          this.container.y - 70,
+          burst >= 3 ? `📜 the party returns (${burst})` : "📜",
+          {
+            fontFamily: "monospace",
+            fontSize: burst >= 3 ? "10px" : "14px",
+            color: "#e8e3d0",
+          },
+        )
+        .setOrigin(0.5)
+        .setDepth(30);
+      this.scene.tweens.add({
+        targets: scroll,
+        y: scroll.y - 26,
+        alpha: 0,
+        duration: 1400,
+        onComplete: () => scroll.destroy(),
+      });
+    }
+    this.finishedTasks = finished;
   }
 
   private applyStatus(status: AgentStatus): void {
@@ -263,11 +388,13 @@ export class VillageScene extends Phaser.Scene {
   private interactKey!: Phaser.Input.Keyboard.Key;
   private mirrorKey!: Phaser.Input.Keyboard.Key;
   private journalKey!: Phaser.Input.Keyboard.Key;
+  private cheatKey!: Phaser.Input.Keyboard.Key;
   private npcs = new Map<string, NpcView>();
   private endedMarkers = new Set<string>();
   private prompt!: Phaser.GameObjects.Text;
   private keysEnabled = true;
   private unsubAgents: (() => void) | null = null;
+  private unsubDistricts: (() => void) | null = null;
   private dead = false;
   // §12 camp clustering
   private slots = new SlotAllocator(MAX_VILLAGE_NPCS);
@@ -275,6 +402,18 @@ export class VillageScene extends Phaser.Scene {
   private camped = new Set<string>();
   private campBadge!: Phaser.GameObjects.Text;
   private campTent!: Phaser.GameObjects.Image;
+  // §1 districts
+  private districtObjects: Phaser.GameObjects.GameObject[] = [];
+  private districtGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private districtPositions = new Map<string, { x: number; y: number }>();
+  private lastDistricts = "";
+  private npcDistrict = new Map<string, string | null>();
+  // §14/§16 gatekeeper + cheats + eggs
+  private gatekeeper!: Phaser.GameObjects.Image;
+  private wallHits = 0;
+  private wallOpened = false;
+  private revealed = false;
+  private noclipApplied = false;
 
   constructor() {
     super("village");
@@ -292,11 +431,8 @@ export class VillageScene extends Phaser.Scene {
     this.player.body?.setSize(18, 12);
     this.player.body?.setOffset(3, 16);
 
-    const houses = this.physics.add.staticGroup();
-    for (const pos of HOUSES) {
-      houses.create(pos.x, pos.y, "house").setSize(90, 48).setOffset(3, 30);
-    }
-    this.physics.add.collider(this.player, houses);
+    this.districtGroup = this.physics.add.staticGroup();
+    this.physics.add.collider(this.player, this.districtGroup);
 
     this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -310,6 +446,7 @@ export class VillageScene extends Phaser.Scene {
     this.interactKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.mirrorKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
     this.journalKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.cheatKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
 
     this.prompt = this.add
       .text(0, 0, "E", {
@@ -324,6 +461,10 @@ export class VillageScene extends Phaser.Scene {
       .setVisible(false);
 
     this.unsubAgents = gameStore.sub(agentsAtom, () => this.syncAgents());
+    this.unsubDistricts = gameStore.sub(districtsAtom, () =>
+      this.buildDistricts(),
+    );
+    this.buildDistricts();
     this.syncAgents();
 
     // Unsubscribe on both SHUTDOWN and DESTROY: game.destroy() emits only
@@ -333,6 +474,8 @@ export class VillageScene extends Phaser.Scene {
       this.dead = true;
       this.unsubAgents?.();
       this.unsubAgents = null;
+      this.unsubDistricts?.();
+      this.unsubDistricts = null;
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubscribe);
     this.events.once(Phaser.Scenes.Events.DESTROY, unsubscribe);
@@ -340,15 +483,12 @@ export class VillageScene extends Phaser.Scene {
 
   private buildWorld(): void {
     this.add.tileSprite(0, 0, WORLD_W, WORLD_H, "grass").setOrigin(0);
-    // path from the portal to the plaza, plus the plaza itself
     this.add
       .tileSprite(PLAZA.x - 32, PLAZA.y, 64, PORTAL.y - PLAZA.y, "path")
       .setOrigin(0.5, 0);
     this.add.tileSprite(PLAZA.x, PLAZA.y, 288, 224, "path").setOrigin(0.5, 0.5);
     this.add.image(PLAZA.x, PLAZA.y, "fountain").setDepth(4);
-    for (const pos of HOUSES) {
-      this.add.image(pos.x, pos.y, "house").setDepth(3);
-    }
+
     const portal = this.add.image(PORTAL.x, PORTAL.y, "portal").setDepth(4);
     this.tweens.add({
       targets: portal,
@@ -359,6 +499,30 @@ export class VillageScene extends Phaser.Scene {
       repeat: -1,
       ease: "Sine.easeInOut",
     });
+
+    // §9a quest board, §9d tavern, §9e watchtower + scrying pool
+    this.add.image(BOARD.x, BOARD.y, "board").setDepth(4);
+    this.add.image(TAVERN.x, TAVERN.y, "tavern").setDepth(3);
+    this.addLabel(TAVERN.x, TAVERN.y + 48, "tavern");
+    this.add.image(TOWER.x, TOWER.y, "tower").setDepth(3);
+    this.addLabel(TOWER.x, TOWER.y + 48, "scrying pool");
+
+    // §15 — the delightful and slightly arbitrary
+    this.add.image(POND.x, POND.y, "pond").setDepth(2);
+    this.add.image(POND.x + 40, POND.y - 10, "duck").setDepth(3);
+    this.add.image(80, 108, "statue").setDepth(3);
+    this.add.image(140, 108, "statue").setDepth(3);
+    this.addLabel(80, 132, "Claude 1");
+    this.addLabel(140, 132, "Claude 2");
+    this.add.image(1215, 424, "oldman").setDepth(3);
+    this.add.image(1070, 796, "bones").setDepth(3);
+    this.add.image(60, 254, "rock").setDepth(3);
+
+    // §14 the gatekeeper — appears when the classifier holds the gates
+    this.gatekeeper = this.add
+      .image(688, 648, "gatekeeper")
+      .setDepth(9)
+      .setVisible(false);
 
     // §12 camp: hidden until someone actually has to pitch a tent.
     this.campTent = this.add
@@ -378,6 +542,51 @@ export class VillageScene extends Phaser.Scene {
       .setVisible(false);
   }
 
+  private addLabel(
+    x: number,
+    y: number,
+    text: string,
+  ): Phaser.GameObjects.Text {
+    return this.add
+      .text(x, y, text, {
+        fontFamily: "monospace",
+        fontSize: "9px",
+        color: "#e8e3d0",
+        backgroundColor: "#151b28",
+        padding: { x: 3, y: 1 },
+      })
+      .setOrigin(0.5)
+      .setDepth(5);
+  }
+
+  /** §1/§12 — one house per top-level directory, rebuilt when the list changes. */
+  private buildDistricts(): void {
+    if (this.dead) return;
+    const districts = gameStore.get(districtsAtom);
+    const key = districts.join("|");
+    if (key === this.lastDistricts) return;
+    this.lastDistricts = key;
+
+    for (const object of this.districtObjects) object.destroy();
+    this.districtObjects = [];
+    this.districtGroup.clear(true, true);
+    this.districtPositions.clear();
+
+    districts.forEach((name, i) => {
+      const spot = DISTRICT_SPOTS[i];
+      if (!spot) return;
+      const house = this.districtGroup.create(
+        spot.x,
+        spot.y,
+        "house",
+      ) as Phaser.Physics.Arcade.Sprite;
+      house.setDepth(3).setSize(90, 48).setOffset(3, 30);
+      const label = this.addLabel(spot.x, spot.y + 52, `${name}/`);
+      this.districtObjects.push(house, label);
+      this.districtPositions.set(name, { x: spot.x, y: spot.y + 84 });
+    });
+  }
+
   private syncAgents(): void {
     if (this.dead) return;
     const agents = gameStore.get(agentsAtom);
@@ -387,11 +596,9 @@ export class VillageScene extends Phaser.Scene {
       if (agent.status === "ended") {
         this.camped.delete(agent.id);
         if (view) {
-          // The view plays its own fade-to-chest; free the ground for reuse.
           this.releasePin(agent.id);
           view.update(agent);
         } else if (!this.endedMarkers.has(agent.id)) {
-          // Departed before this scene existed — just the trace (§9).
           this.endedMarkers.add(agent.id);
           const spot = this.slots.take(agent.id);
           const slot = slotFor(spot ?? 0);
@@ -403,11 +610,11 @@ export class VillageScene extends Phaser.Scene {
 
       if (view) {
         view.update(agent);
+        this.moveForDistrict(agent, view);
         continue;
       }
       if (this.camped.has(agent.id)) continue;
 
-      // New active agent: pin it if the village has room, else camp it.
       const slotIndex = this.slots.take(agent.id);
       if (slotIndex === null) {
         this.camped.add(agent.id);
@@ -422,6 +629,24 @@ export class VillageScene extends Phaser.Scene {
       npc.update(agent);
     }
     this.updateCamp();
+
+    // §14 gatekeeper appears when any live agent runs in auto mode.
+    this.gatekeeper.setVisible(
+      agents.some((a) => a.permissionMode === "auto" && a.status !== "ended"),
+    );
+  }
+
+  /** §1 — the NPC visibly walks to the district it's working in. */
+  private moveForDistrict(agent: AgentSnapshot, view: NpcView): void {
+    const previous = this.npcDistrict.get(agent.id) ?? null;
+    if (agent.district === previous) return;
+    this.npcDistrict.set(agent.id, agent.district);
+    const door = agent.district
+      ? this.districtPositions.get(agent.district)
+      : null;
+    // small deterministic offset so two agents in one district don't stack
+    const jitter = (agent.id.charCodeAt(agent.id.length - 1) % 5) * 12 - 24;
+    view.walkTo(door ? { x: door.x + jitter, y: door.y } : view.home);
   }
 
   private releasePin(id: string): void {
@@ -466,10 +691,120 @@ export class VillageScene extends Phaser.Scene {
   /** §4 Mirror warp: teleport the player next to the agent's NPC. */
   private handleWarp(id: string): void {
     this.promoteFromCamp(id);
-    const slotIndex = this.slots.slotOf(id);
-    if (slotIndex === null) return;
-    const slot = slotFor(slotIndex);
-    this.player.setPosition(slot.x + 44, slot.y + 14);
+    const view = this.npcs.get(id);
+    if (!view) return;
+    this.player.setPosition(view.home.x + 44, view.home.y + 14);
+  }
+
+  /** §16 level select — teleport to a named place. */
+  private handleCheatWarp(name: string): void {
+    if (name === "mirror") {
+      gameStore.set(uiModeAtom, { mode: "mirror" });
+      return;
+    }
+    const places: Record<string, { x: number; y: number }> = {
+      portal: PORTAL,
+      plaza: PLAZA,
+      camp: CAMP,
+      tavern: { x: TAVERN.x, y: TAVERN.y + 70 },
+      pool: { x: TOWER.x, y: TOWER.y + 80 },
+      board: { x: BOARD.x, y: BOARD.y + 40 },
+      pond: { x: POND.x + 60, y: POND.y },
+    };
+    const district = this.districtPositions.get(name);
+    const target = district ?? places[name];
+    if (target) {
+      this.player.setPosition(target.x, target.y + 10);
+      localToast("info", `✦ warped to ${name}`);
+    } else {
+      localToast("warn", `No such place: ${name}`);
+    }
+  }
+
+  /** §16 reveal map — light up every hidden thing at once. */
+  private revealEggs(): void {
+    if (this.revealed) return;
+    this.revealed = true;
+    for (const egg of EGGS) {
+      const marker = this.add
+        .text(egg.x, egg.y - 26, "✦", {
+          fontSize: "14px",
+          color: "#d4a017",
+        })
+        .setOrigin(0.5)
+        .setDepth(25);
+      this.tweens.add({
+        targets: marker,
+        alpha: { from: 1, to: 0.3 },
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+  }
+
+  /** §15 — talk to the strange things scattered around the village. */
+  private interactEgg(eggId: string): void {
+    switch (eggId) {
+      case "duck": {
+        const last = gameStore.get(lastSteerAtom);
+        localToast(
+          "info",
+          last
+            ? `🦆 the duck repeats, flatly: "${last.slice(0, 90)}"`
+            : "🦆 the duck waits. Rubber-duck debugging requires you to go first.",
+        );
+        break;
+      }
+      case "statue1":
+        localToast(
+          "info",
+          "A dusty statue of Claude 1. The plaque reads: “it wrote poems, slowly, and we loved it anyway.”",
+        );
+        break;
+      case "statue2":
+        localToast(
+          "info",
+          "Claude 2's statue. Someone has scratched “100k context ought to be enough for anybody” into the base.",
+        );
+        break;
+      case "oldman":
+        if (!gameStore.get(shieldAtom)) {
+          gameStore.set(shieldAtom, true);
+          localStorage.setItem("aq-shield", "1");
+          localToast(
+            "info",
+            "🛡 “It's dangerous to git push --force alone — take this.”",
+          );
+        } else {
+          localToast("info", "“Ah, you still carry my shield,” he smiles.");
+        }
+        break;
+      case "skeleton":
+        localToast(
+          "info",
+          "💀 A skeleton in the weeds. Its name tag reads: “TODO: fix later”.",
+        );
+        break;
+      case "wall":
+        if (this.wallOpened) {
+          localToast("info", "The crack in the rock glitters faintly.");
+          break;
+        }
+        this.wallHits += 1;
+        if (this.wallHits >= 5) {
+          this.wallOpened = true;
+          localToast(
+            "info",
+            "✨ The rock cracks open! Inside: a very shiny pebble. It does nothing. You love it.",
+          );
+        } else {
+          localToast("info", `The rock sounds hollow… (${this.wallHits}/5)`);
+        }
+        break;
+      default:
+        break;
+    }
   }
 
   update(): void {
@@ -491,6 +826,21 @@ export class VillageScene extends Phaser.Scene {
       gameStore.set(warpTargetAtom, null);
       this.handleWarp(warpTarget);
     }
+    const cheatWarp = gameStore.get(cheatWarpAtom);
+    if (cheatWarp) {
+      gameStore.set(cheatWarpAtom, null);
+      this.handleCheatWarp(cheatWarp);
+    }
+    if (gameStore.get(revealMapAtom)) this.revealEggs();
+
+    // §16 noclip — float over everything, purely cosmetic.
+    const noclip = gameStore.get(noclipAtom);
+    if (noclip !== this.noclipApplied) {
+      this.noclipApplied = noclip;
+      const body = this.player.body as Phaser.Physics.Arcade.Body | null;
+      if (body) body.checkCollision.none = noclip;
+      this.player.setAlpha(noclip ? 0.6 : 1);
+    }
 
     if (roaming) {
       if (Phaser.Input.Keyboard.JustDown(this.mirrorKey)) {
@@ -498,6 +848,9 @@ export class VillageScene extends Phaser.Scene {
       }
       if (Phaser.Input.Keyboard.JustDown(this.journalKey)) {
         gameStore.set(journalOpenAtom, !gameStore.get(journalOpenAtom));
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.cheatKey)) {
+        gameStore.set(uiModeAtom, { mode: "cheat" });
       }
     }
 
@@ -514,11 +867,11 @@ export class VillageScene extends Phaser.Scene {
       if (this.cursors.up.isDown || this.wasd.W.isDown) vy -= 1;
       if (this.cursors.down.isDown || this.wasd.S.isDown) vy += 1;
     }
+    const speed = gameStore.get(speedBoostAtom)
+      ? PLAYER_SPEED * 2
+      : PLAYER_SPEED;
     const len = Math.hypot(vx, vy) || 1;
-    this.player.setVelocity(
-      (vx / len) * PLAYER_SPEED,
-      (vy / len) * PLAYER_SPEED,
-    );
+    this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
     if (vx !== 0) this.player.setFlipX(vx < 0);
   }
 
@@ -526,62 +879,80 @@ export class VillageScene extends Phaser.Scene {
     const px = this.player.x;
     const py = this.player.y;
 
-    let nearest: Interactable = null;
-    let nearestDist = INTERACT_RANGE;
-    let promptX = 0;
-    let promptY = 0;
+    const found: {
+      value: Interactable;
+      dist: number;
+      x: number;
+      y: number;
+    } = { value: null, dist: INTERACT_RANGE, x: 0, y: 0 };
 
-    const portalDist = Phaser.Math.Distance.Between(px, py, PORTAL.x, PORTAL.y);
-    if (portalDist < nearestDist) {
-      nearest = { kind: "portal" };
-      nearestDist = portalDist;
-      promptX = PORTAL.x;
-      promptY = PORTAL.y - 48;
-    }
-    if (this.camped.size > 0) {
-      const campDist = Phaser.Math.Distance.Between(px, py, CAMP.x, CAMP.y);
-      if (campDist < nearestDist) {
-        nearest = { kind: "camp" };
-        nearestDist = campDist;
-        promptX = CAMP.x;
-        promptY = CAMP.y - 40;
+    const consider = (
+      candidate: Exclude<Interactable, null>,
+      x: number,
+      y: number,
+      promptOffset = 48,
+    ) => {
+      const dist = Phaser.Math.Distance.Between(px, py, x, y);
+      if (dist < found.dist) {
+        found.value = candidate;
+        found.dist = dist;
+        found.x = x;
+        found.y = y - promptOffset;
       }
+    };
+
+    consider({ kind: "portal" }, PORTAL.x, PORTAL.y);
+    consider({ kind: "board" }, BOARD.x, BOARD.y);
+    consider({ kind: "tavern" }, TAVERN.x, TAVERN.y + 40, 84);
+    consider({ kind: "scry" }, TOWER.x, TOWER.y + 60, 110);
+    if (this.camped.size > 0) consider({ kind: "camp" }, CAMP.x, CAMP.y, 40);
+    for (const egg of EGGS) {
+      consider({ kind: "egg", eggId: egg.id }, egg.x, egg.y, 34);
     }
     for (const [id, view] of this.npcs) {
       const agent = gameStore.get(agentsAtom).find((a) => a.id === id);
       if (!agent || agent.status === "ended") continue;
-      const dist = Phaser.Math.Distance.Between(px, py, view.x, view.y);
-      if (dist < nearestDist) {
-        nearest = { kind: "npc", agentId: id };
-        nearestDist = dist;
-        promptX = view.x;
-        promptY = view.y - 92;
-      }
+      consider({ kind: "npc", agentId: id }, view.x, view.y, 92);
     }
 
     const current = gameStore.get(nearbyAtom);
-    if (JSON.stringify(current) !== JSON.stringify(nearest)) {
-      gameStore.set(nearbyAtom, nearest);
+    if (JSON.stringify(current) !== JSON.stringify(found.value)) {
+      gameStore.set(nearbyAtom, found.value);
     }
 
-    this.prompt.setVisible(roaming && nearest !== null);
-    if (nearest) this.prompt.setPosition(promptX, promptY);
+    this.prompt.setVisible(roaming && found.value !== null);
+    if (found.value) this.prompt.setPosition(found.x, found.y);
 
     if (
       roaming &&
-      nearest &&
+      found.value &&
       Phaser.Input.Keyboard.JustDown(this.interactKey)
     ) {
-      // The camp opens the Mirror — the dispatch console for everyone
-      // without a sprite (§12).
-      gameStore.set(
-        uiModeAtom,
-        nearest.kind === "portal"
-          ? { mode: "summon" }
-          : nearest.kind === "camp"
-            ? { mode: "mirror" }
-            : { mode: "talk", agentId: nearest.agentId },
-      );
+      const target: Exclude<Interactable, null> = found.value;
+      switch (target.kind) {
+        case "portal":
+          gameStore.set(uiModeAtom, { mode: "summon" });
+          break;
+        case "board":
+          gameStore.set(uiModeAtom, { mode: "board" });
+          break;
+        case "tavern":
+          gameStore.set(uiModeAtom, { mode: "tavern" });
+          break;
+        case "scry":
+          gameStore.set(uiModeAtom, { mode: "scry" });
+          break;
+        case "camp":
+          // The camp opens the Mirror — the dispatch console (§12).
+          gameStore.set(uiModeAtom, { mode: "mirror" });
+          break;
+        case "egg":
+          this.interactEgg(target.eggId);
+          break;
+        case "npc":
+          gameStore.set(uiModeAtom, { mode: "talk", agentId: target.agentId });
+          break;
+      }
     }
   }
 }

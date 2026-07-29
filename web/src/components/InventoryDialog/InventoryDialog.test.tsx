@@ -22,6 +22,11 @@ function agentWith(inventory: AgentSnapshot["inventory"]): AgentSnapshot {
     inventory,
     toolUses: {},
     quests: [],
+    district: null,
+    permissionMode: "default",
+    planPending: false,
+    tomePreview: null,
+    tasks: [],
   };
 }
 

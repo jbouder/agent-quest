@@ -128,8 +128,96 @@ export function generateTextures(scene: Phaser.Scene): void {
   g.generateTexture("chest", 20, 16);
   g.destroy();
 
-  // player + one NPC skin per model tier
+  const g2 = scene.add.graphics();
+
+  // quest board (§9a)
+  g2.fillStyle(0x6d5530);
+  g2.fillRect(6, 8, 44, 30);
+  g2.fillStyle(0xd8cba8);
+  g2.fillRect(10, 12, 36, 22);
+  g2.fillStyle(0x54402c);
+  g2.fillRect(12, 38, 5, 14);
+  g2.fillRect(39, 38, 5, 14);
+  g2.fillStyle(0x8a6f4d);
+  g2.fillRect(14, 16, 28, 2);
+  g2.fillRect(14, 21, 22, 2);
+  g2.fillRect(14, 26, 25, 2);
+  g2.generateTexture("board", 56, 52);
+  g2.clear();
+
+  // watchtower with scrying pool (§9e)
+  g2.fillStyle(0x565f75);
+  g2.fillRect(10, 10, 28, 52);
+  g2.fillStyle(0x6a748c);
+  g2.fillRect(6, 4, 36, 10);
+  g2.fillStyle(0x2c3446);
+  g2.fillRect(20, 40, 10, 22);
+  g2.fillStyle(0x46b8ae);
+  g2.fillEllipse(24, 70, 34, 12);
+  g2.fillStyle(0x9be8e0);
+  g2.fillEllipse(24, 70, 18, 6);
+  g2.generateTexture("tower", 48, 78);
+  g2.clear();
+
+  // tavern (§9d) — a wider, warmer house
+  g2.fillStyle(0x7a5a3a);
+  g2.fillRect(4, 30, 112, 54);
+  g2.fillStyle(0x5c3f2a);
+  g2.fillTriangle(0, 32, 60, 0, 120, 32);
+  g2.fillStyle(0x3a2c1e);
+  g2.fillRect(52, 56, 18, 28);
+  g2.fillStyle(0xf2b16b);
+  g2.fillRect(16, 46, 14, 14);
+  g2.fillRect(90, 46, 14, 14);
+  g2.fillStyle(0xd4a017);
+  g2.fillRect(46, 36, 28, 8);
+  g2.generateTexture("tavern", 120, 84);
+  g2.clear();
+
+  // pond + duck (§15)
+  g2.fillStyle(0x3f6fb8);
+  g2.fillEllipse(40, 24, 76, 42);
+  g2.fillStyle(0x5a8fe0);
+  g2.fillEllipse(40, 24, 58, 30);
+  g2.generateTexture("pond", 80, 48);
+  g2.clear();
+  g2.fillStyle(0xf2d16b);
+  g2.fillEllipse(8, 10, 14, 10);
+  g2.fillCircle(15, 5, 5);
+  g2.fillStyle(0xd4791a);
+  g2.fillRect(19, 4, 5, 3);
+  g2.fillStyle(0x1d1d24);
+  g2.fillRect(15, 3, 2, 2);
+  g2.generateTexture("duck", 26, 18);
+  g2.clear();
+
+  // dusty statue on a pedestal (§15)
+  g2.fillStyle(0x6a748c);
+  g2.fillRect(4, 36, 24, 10);
+  g2.fillStyle(0x8a93a8);
+  g2.fillRect(10, 10, 12, 26);
+  g2.fillCircle(16, 8, 6);
+  g2.generateTexture("statue", 32, 46);
+  g2.clear();
+
+  // cracked rock (§15 secret) and bones (§15 skeleton)
+  g2.fillStyle(0x7d8499);
+  g2.fillCircle(16, 18, 14);
+  g2.fillStyle(0x5c6377);
+  g2.fillRect(14, 6, 3, 16);
+  g2.generateTexture("rock", 32, 32);
+  g2.clear();
+  g2.fillStyle(0xe8e3d0);
+  g2.fillCircle(8, 6, 5);
+  g2.fillRect(4, 12, 16, 3);
+  g2.fillRect(6, 17, 12, 3);
+  g2.generateTexture("bones", 24, 22);
+  g2.destroy();
+
+  // player + one NPC skin per model tier, plus villagers
   character(scene, "player", 0x2e7d32, 0x6b4a2f);
+  character(scene, "oldman", 0x8a8a9a, 0xe8e3d0);
+  character(scene, "gatekeeper", 0x8f2f2f, 0x2c2c34);
   for (const [tier, color] of Object.entries(TIER_COLORS)) {
     character(scene, `npc-${tier}`, color, 0x2c2c34);
   }
