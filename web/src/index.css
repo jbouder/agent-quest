@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Semantic tokens for the Agent Quest UI — a dusk-village palette.
+   Always use these (bg-background, text-foreground, …), never raw colors. */
+@theme {
+  --color-background: #0b0e14;
+  --color-foreground: #e8e3d0;
+  --color-card: #151b28;
+  --color-card-foreground: #e8e3d0;
+  --color-border: #2b3550;
+  --color-primary: #d4a017;
+  --color-primary-foreground: #1a1408;
+  --color-accent: #46b8ae;
+  --color-accent-foreground: #06211f;
+  --color-destructive: #c74a4a;
+  --color-destructive-foreground: #fbeaea;
+  --color-muted: #7d8499;
+  --color-heart: #e04848;
+
+  --font-quest: "Courier New", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-quest);
+  overflow: hidden;
+}
+
+canvas {
+  image-rendering: pixelated;
+}
