@@ -108,6 +108,16 @@ export function generateTextures(scene: Phaser.Scene): void {
   g.generateTexture("fountain", 48, 48);
   g.clear();
 
+  // camp tent (§12: agents past the village cap cluster here)
+  g.fillStyle(0x8a6d3b);
+  g.fillTriangle(0, 40, 28, 4, 56, 40);
+  g.fillStyle(0x6d5530);
+  g.fillTriangle(8, 40, 28, 12, 48, 40);
+  g.fillStyle(0x3a2c1e);
+  g.fillTriangle(20, 40, 28, 22, 36, 40);
+  g.generateTexture("tent", 56, 42);
+  g.clear();
+
   // treasure chest marker (a finished quest leaves a trace, §9)
   g.fillStyle(0x7a5230);
   g.fillRect(0, 6, 20, 10);

@@ -7,12 +7,15 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
+  type AgentInventory,
   type AgentSnapshot,
   type AgentStatus,
   contextLimitFor,
   type JournalKind,
   type PendingPermission,
   type PermissionMode,
+  type Quest,
+  type ToolUseStat,
 } from "../../shared/protocol";
 import { MonotonicCounter } from "./budget";
 
@@ -120,6 +123,77 @@ interface PendingPermissionInternal extends PendingPermission {
 }
 
 /**
+ * §6 quest log: the agent's own todo list, taken from TodoWrite tool calls.
+ * Tolerant of shape drift — anything unrecognized is simply skipped.
+ */
+export function parseQuests(input: Record<string, unknown>): Quest[] | null {
+  const todos = input.todos;
+  if (!Array.isArray(todos)) return null;
+  const quests: Quest[] = [];
+  for (const todo of todos) {
+    if (typeof todo !== "object" || todo === null) continue;
+    const record = todo as Record<string, unknown>;
+    const title = record.content;
+    if (typeof title !== "string" || title.length === 0) continue;
+    const status =
+      record.status === "in_progress" || record.status === "completed"
+        ? record.status
+        : "pending";
+    quests.push({ title, status });
+  }
+  return quests;
+}
+
+/**
+ * §6 quest log for the newer task tools (TaskCreate/TaskUpdate), which
+ * replaced TodoWrite in recent Claude Code versions. We only see tool-call
+ * inputs, not results, so task ids are inferred from creation order —
+ * they're sequential small integers in a fresh session. Display-only, so a
+ * mismatch degrades gracefully.
+ */
+export class QuestTracker {
+  private byId = new Map<string, Quest>();
+  private nextId = 1;
+
+  handleToolUse(toolName: string, input: Record<string, unknown>): boolean {
+    if (toolName === "TodoWrite") {
+      const quests = parseQuests(input);
+      if (!quests) return false;
+      this.byId.clear();
+      quests.forEach((quest, i) => this.byId.set(String(i + 1), quest));
+      this.nextId = quests.length + 1;
+      return true;
+    }
+    if (toolName === "TaskCreate") {
+      const title = input.subject;
+      if (typeof title !== "string" || title.length === 0) return false;
+      this.byId.set(String(this.nextId++), { title, status: "pending" });
+      return true;
+    }
+    if (toolName === "TaskUpdate") {
+      const quest = this.byId.get(String(input.taskId));
+      if (!quest) return false;
+      if (
+        input.status === "pending" ||
+        input.status === "in_progress" ||
+        input.status === "completed"
+      ) {
+        quest.status = input.status;
+      }
+      if (typeof input.subject === "string" && input.subject.length > 0) {
+        quest.title = input.subject;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  list(): Quest[] {
+    return [...this.byId.values()];
+  }
+}
+
+/**
  * One live Claude Code session, wrapped as an NPC. Holds the real control
  * handle (§11): the Query object plus the open input queue.
  */
@@ -139,6 +213,10 @@ export class AgentSession {
   private sessionId: string | null = null;
   private lastResult: string | null = null;
   private compactions = 0;
+  private inventory: AgentInventory | null = null;
+  private toolUses: Record<string, ToolUseStat> = {};
+  private quests: Quest[] = [];
+  private questTracker = new QuestTracker();
 
   private queue = new InputQueue();
   private q: Query | null = null;
@@ -197,6 +275,9 @@ export class AgentSession {
         : null,
       lastResult: this.lastResult,
       compactions: this.compactions,
+      inventory: this.inventory,
+      toolUses: this.toolUses,
+      quests: this.quests,
     };
   }
 
@@ -235,6 +316,20 @@ export class AgentSession {
   resume(text?: string): void {
     if (this.ended) return;
     this.steer(text ?? "Please continue where you left off.");
+  }
+
+  /** §5a — swap the model mid-session: a real re-equip via the SDK. */
+  async equipModel(model: string): Promise<void> {
+    if (this.ended || !this.q) return;
+    try {
+      await this.q.setModel(model);
+      this.model = model;
+      this.contextLimit = contextLimitFor(model);
+      this.events.onJournal("status", `⚔ re-equipped: now wielding ${model}`);
+      this.events.onChange();
+    } catch (error) {
+      this.events.onJournal("error", `re-equip failed: ${String(error)}`);
+    }
   }
 
   /** §7 dismiss — final, not a freeze. */
@@ -342,6 +437,15 @@ export class AgentSession {
         if (message.subtype === "init") {
           this.sessionId = message.session_id;
           this.model = message.model;
+          this.inventory = {
+            tools: message.tools,
+            skills: message.skills ?? [],
+            slashCommands: message.slash_commands ?? [],
+            mcpServers: message.mcp_servers.map(({ name, status }) => ({
+              name,
+              status,
+            })),
+          };
           if (this.status === "summoning") {
             this.setStatus("thinking", "reading the quest…");
           }
@@ -376,12 +480,18 @@ export class AgentSession {
         }
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
+            const input = (block.input ?? {}) as Record<string, unknown>;
+            const stat = this.toolUses[block.name];
+            this.toolUses[block.name] = {
+              count: (stat?.count ?? 0) + 1,
+              lastTs: Date.now(),
+            };
+            if (this.questTracker.handleToolUse(block.name, input)) {
+              this.quests = this.questTracker.list();
+            }
             this.outstandingTools.set(
               block.id,
-              summarizeToolInput(
-                block.name,
-                (block.input ?? {}) as Record<string, unknown>,
-              ),
+              summarizeToolInput(block.name, input),
             );
             this.setStatus("tool_running", this.outstandingTools.get(block.id));
             this.events.onJournal(

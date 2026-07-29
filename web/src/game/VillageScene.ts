@@ -5,15 +5,19 @@ import {
   agentsAtom,
   gameStore,
   type Interactable,
+  journalOpenAtom,
   nearbyAtom,
   uiModeAtom,
+  warpTargetAtom,
 } from "@/store/gameAtoms";
 import { generateTextures, modelTier } from "./textures";
+import { MAX_VILLAGE_NPCS, pickEviction, SlotAllocator } from "./villagePlan";
 
 const WORLD_W = 1280;
 const WORLD_H = 960;
 const PLAZA = { x: 640, y: 430 };
 const PORTAL = { x: 640, y: 810 };
+const CAMP = { x: 985, y: 760 };
 const PLAYER_SPEED = 190;
 const INTERACT_RANGE = 64;
 
@@ -25,11 +29,14 @@ const HOUSES = [
   { x: 980, y: 620 },
 ];
 
-/** Where the Nth agent stands: in front of a house, cycling. */
+/** Fixed standing spots for the pinned agents (§12). */
+const SLOTS = [
+  ...HOUSES.map((house) => ({ x: house.x, y: house.y + 84 })),
+  { x: PLAZA.x + 120, y: PLAZA.y + 130 },
+];
+
 function slotFor(index: number): { x: number; y: number } {
-  const house = HOUSES[index % HOUSES.length] ?? PLAZA;
-  const shift = Math.floor(index / HOUSES.length) * 36;
-  return { x: house.x + shift, y: house.y + 84 };
+  return SLOTS[index % SLOTS.length] ?? PLAZA;
 }
 
 const STATUS_ICON: Record<AgentStatus, string> = {
@@ -65,7 +72,8 @@ class NpcView {
   constructor(
     private scene: Phaser.Scene,
     agent: AgentSnapshot,
-    index: number,
+    slot: { x: number; y: number },
+    from: { x: number; y: number },
   ) {
     const tier = modelTier(agent.model);
     this.body = scene.add.image(0, 0, `npc-${tier}`).setOrigin(0.5, 1);
@@ -99,7 +107,7 @@ class NpcView {
       })
       .setOrigin(0.5, 1);
 
-    this.container = scene.add.container(PORTAL.x, PORTAL.y - 20, [
+    this.container = scene.add.container(from.x, from.y, [
       this.body,
       this.nameText,
       healthBg,
@@ -109,14 +117,28 @@ class NpcView {
     ]);
     this.container.setDepth(10);
 
-    // §8: entrance animation — walk in from the portal to your post.
-    const slot = slotFor(index);
+    // §8: entrance animation — walk from the portal (or camp) to your post.
     scene.tweens.add({
       targets: this.container,
       x: slot.x,
       y: slot.y,
       duration: 2200,
       ease: "Sine.easeInOut",
+    });
+  }
+
+  /** §12 eviction: strike the tents and head to camp, then despawn. */
+  walkToCampAndDestroy(camp: { x: number; y: number }): void {
+    this.statusTween?.remove();
+    this.statusTween = null;
+    this.scene.tweens.add({
+      targets: this.container,
+      x: camp.x,
+      y: camp.y + 26,
+      alpha: 0.4,
+      duration: 1600,
+      ease: "Sine.easeInOut",
+      onComplete: () => this.destroy(),
     });
   }
 
@@ -239,13 +261,20 @@ export class VillageScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<"W" | "A" | "S" | "D", Phaser.Input.Keyboard.Key>;
   private interactKey!: Phaser.Input.Keyboard.Key;
+  private mirrorKey!: Phaser.Input.Keyboard.Key;
+  private journalKey!: Phaser.Input.Keyboard.Key;
   private npcs = new Map<string, NpcView>();
-  private spawnOrder: string[] = [];
   private endedMarkers = new Set<string>();
   private prompt!: Phaser.GameObjects.Text;
   private keysEnabled = true;
   private unsubAgents: (() => void) | null = null;
   private dead = false;
+  // §12 camp clustering
+  private slots = new SlotAllocator(MAX_VILLAGE_NPCS);
+  private pinOrder: string[] = [];
+  private camped = new Set<string>();
+  private campBadge!: Phaser.GameObjects.Text;
+  private campTent!: Phaser.GameObjects.Image;
 
   constructor() {
     super("village");
@@ -279,6 +308,8 @@ export class VillageScene extends Phaser.Scene {
     this.cursors = keyboard.createCursorKeys();
     this.wasd = keyboard.addKeys("W,A,S,D") as VillageScene["wasd"];
     this.interactKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.mirrorKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this.journalKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
 
     this.prompt = this.add
       .text(0, 0, "E", {
@@ -328,30 +359,117 @@ export class VillageScene extends Phaser.Scene {
       repeat: -1,
       ease: "Sine.easeInOut",
     });
+
+    // §12 camp: hidden until someone actually has to pitch a tent.
+    this.campTent = this.add
+      .image(CAMP.x, CAMP.y, "tent")
+      .setDepth(4)
+      .setVisible(false);
+    this.campBadge = this.add
+      .text(CAMP.x + 26, CAMP.y - 24, "", {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: "#1a1408",
+        backgroundColor: "#d4a017",
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(5)
+      .setVisible(false);
   }
 
   private syncAgents(): void {
     if (this.dead) return;
     const agents = gameStore.get(agentsAtom);
     for (const agent of agents) {
-      let view = this.npcs.get(agent.id);
-      if (!view) {
-        if (!this.spawnOrder.includes(agent.id)) this.spawnOrder.push(agent.id);
-        const index = this.spawnOrder.indexOf(agent.id);
-        if (agent.status === "ended") {
-          // Already departed before this scene existed — just the trace (§9).
-          if (!this.endedMarkers.has(agent.id)) {
-            this.endedMarkers.add(agent.id);
-            const slot = slotFor(index);
-            this.add.image(slot.x, slot.y - 6, "chest").setDepth(5);
-          }
-          continue;
+      const view = this.npcs.get(agent.id);
+
+      if (agent.status === "ended") {
+        this.camped.delete(agent.id);
+        if (view) {
+          // The view plays its own fade-to-chest; free the ground for reuse.
+          this.releasePin(agent.id);
+          view.update(agent);
+        } else if (!this.endedMarkers.has(agent.id)) {
+          // Departed before this scene existed — just the trace (§9).
+          this.endedMarkers.add(agent.id);
+          const spot = this.slots.take(agent.id);
+          const slot = slotFor(spot ?? 0);
+          if (spot !== null) this.slots.release(agent.id);
+          this.add.image(slot.x, slot.y - 6, "chest").setDepth(5);
         }
-        view = new NpcView(this, agent, index);
-        this.npcs.set(agent.id, view);
+        continue;
       }
-      view.update(agent);
+
+      if (view) {
+        view.update(agent);
+        continue;
+      }
+      if (this.camped.has(agent.id)) continue;
+
+      // New active agent: pin it if the village has room, else camp it.
+      const slotIndex = this.slots.take(agent.id);
+      if (slotIndex === null) {
+        this.camped.add(agent.id);
+        continue;
+      }
+      this.pinOrder.push(agent.id);
+      const npc = new NpcView(this, agent, slotFor(slotIndex), {
+        x: PORTAL.x,
+        y: PORTAL.y - 20,
+      });
+      this.npcs.set(agent.id, npc);
+      npc.update(agent);
     }
+    this.updateCamp();
+  }
+
+  private releasePin(id: string): void {
+    this.slots.release(id);
+    this.pinOrder = this.pinOrder.filter((pinned) => pinned !== id);
+  }
+
+  private updateCamp(): void {
+    const count = this.camped.size;
+    this.campTent.setVisible(count > 0);
+    this.campBadge.setVisible(count > 0);
+    if (count > 0) this.campBadge.setText(String(count));
+  }
+
+  /** §12: give a camped agent a full sprite, evicting the LRU pin if full. */
+  private promoteFromCamp(id: string): void {
+    if (!this.camped.has(id)) return;
+    if (this.slots.full) {
+      const evicted = pickEviction(this.pinOrder);
+      if (!evicted) return;
+      const evictedView = this.npcs.get(evicted);
+      this.releasePin(evicted);
+      this.npcs.delete(evicted);
+      this.camped.add(evicted);
+      evictedView?.walkToCampAndDestroy(CAMP);
+    }
+    const slotIndex = this.slots.take(id);
+    if (slotIndex === null) return;
+    this.camped.delete(id);
+    this.pinOrder.push(id);
+    const agent = gameStore.get(agentsAtom).find((a) => a.id === id);
+    if (!agent) return;
+    const npc = new NpcView(this, agent, slotFor(slotIndex), {
+      x: CAMP.x,
+      y: CAMP.y + 26,
+    });
+    this.npcs.set(id, npc);
+    npc.update(agent);
+    this.updateCamp();
+  }
+
+  /** §4 Mirror warp: teleport the player next to the agent's NPC. */
+  private handleWarp(id: string): void {
+    this.promoteFromCamp(id);
+    const slotIndex = this.slots.slotOf(id);
+    if (slotIndex === null) return;
+    const slot = slotFor(slotIndex);
+    this.player.setPosition(slot.x + 44, slot.y + 14);
   }
 
   update(): void {
@@ -365,6 +483,21 @@ export class VillageScene extends Phaser.Scene {
         keyboard.resetKeys();
       } else {
         keyboard.disableGlobalCapture();
+      }
+    }
+
+    const warpTarget = gameStore.get(warpTargetAtom);
+    if (warpTarget) {
+      gameStore.set(warpTargetAtom, null);
+      this.handleWarp(warpTarget);
+    }
+
+    if (roaming) {
+      if (Phaser.Input.Keyboard.JustDown(this.mirrorKey)) {
+        gameStore.set(uiModeAtom, { mode: "mirror" });
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.journalKey)) {
+        gameStore.set(journalOpenAtom, !gameStore.get(journalOpenAtom));
       }
     }
 
@@ -405,6 +538,15 @@ export class VillageScene extends Phaser.Scene {
       promptX = PORTAL.x;
       promptY = PORTAL.y - 48;
     }
+    if (this.camped.size > 0) {
+      const campDist = Phaser.Math.Distance.Between(px, py, CAMP.x, CAMP.y);
+      if (campDist < nearestDist) {
+        nearest = { kind: "camp" };
+        nearestDist = campDist;
+        promptX = CAMP.x;
+        promptY = CAMP.y - 40;
+      }
+    }
     for (const [id, view] of this.npcs) {
       const agent = gameStore.get(agentsAtom).find((a) => a.id === id);
       if (!agent || agent.status === "ended") continue;
@@ -430,11 +572,15 @@ export class VillageScene extends Phaser.Scene {
       nearest &&
       Phaser.Input.Keyboard.JustDown(this.interactKey)
     ) {
+      // The camp opens the Mirror — the dispatch console for everyone
+      // without a sprite (§12).
       gameStore.set(
         uiModeAtom,
         nearest.kind === "portal"
           ? { mode: "summon" }
-          : { mode: "talk", agentId: nearest.agentId },
+          : nearest.kind === "camp"
+            ? { mode: "mirror" }
+            : { mode: "talk", agentId: nearest.agentId },
       );
     }
   }

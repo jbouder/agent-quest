@@ -42,11 +42,13 @@ export interface Toast {
 }
 export const toastsAtom = atom<Toast[]>([]);
 
-/** What the player is doing: roaming, or captured by a dialog. */
+/** What the player is doing: roaming, or captured by a dialog/overlay. */
 export type UiMode =
   | { mode: "roam" }
   | { mode: "summon" }
-  | { mode: "talk"; agentId: string };
+  | { mode: "talk"; agentId: string }
+  | { mode: "mirror" }
+  | { mode: "inventory"; agentId: string };
 
 export const uiModeAtom = atom<UiMode>({ mode: "roam" });
 
@@ -54,14 +56,26 @@ export const uiModeAtom = atom<UiMode>({ mode: "roam" });
 export type Interactable =
   | { kind: "portal" }
   | { kind: "npc"; agentId: string }
+  | { kind: "camp" }
   | null;
 
 export const nearbyAtom = atom<Interactable>(null);
 
+/** §4 Mirror warp: set to an agent id; the scene teleports and clears it. */
+export const warpTargetAtom = atom<string | null>(null);
+
 if (import.meta.env.DEV && typeof window !== "undefined") {
   window.__agentQuestDebug = {
     store: gameStore,
-    atoms: { agentsAtom, playerAtom, connectedAtom, defaultCwdAtom },
+    atoms: {
+      agentsAtom,
+      playerAtom,
+      connectedAtom,
+      defaultCwdAtom,
+      uiModeAtom,
+      journalOpenAtom,
+      warpTargetAtom,
+    },
     get: () => ({
       agents: gameStore.get(agentsAtom),
       player: gameStore.get(playerAtom),

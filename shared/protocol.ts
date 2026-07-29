@@ -22,6 +22,26 @@ export interface PendingPermission {
   inputSummary: string;
 }
 
+/** §5 — what this agent can actually do, from the session init message. */
+export interface AgentInventory {
+  tools: string[];
+  skills: string[];
+  slashCommands: string[];
+  mcpServers: { name: string; status: string }[];
+}
+
+/** §5 — "available" vs "actually reached for": per-tool usage this session. */
+export interface ToolUseStat {
+  count: number;
+  lastTs: number;
+}
+
+/** §6 — one quest-log entry, mirroring the agent's todo/plan list. */
+export interface Quest {
+  title: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
 export interface AgentSnapshot {
   id: string;
   /** Short display name, e.g. "Agent 1". */
@@ -45,6 +65,12 @@ export interface AgentSnapshot {
   lastResult: string | null;
   /** How many times this session has auto-compacted (fainted and gotten up). */
   compactions: number;
+  /** §5 inventory screen; null until the session's init message arrives. */
+  inventory: AgentInventory | null;
+  /** §5 usage glow: tool name → count + last-used timestamp. */
+  toolUses: Record<string, ToolUseStat>;
+  /** §6 quest log, from the agent's todo list. */
+  quests: Quest[];
 }
 
 export interface PlayerState {
@@ -102,6 +128,8 @@ export type ClientCommand =
   | { type: "dismiss"; agentId: string }
   // §7 shield / open palm on a pending tool-use request
   | { type: "permission"; agentId: string; requestId: string; allow: boolean }
+  // §5a — swap the model mid-session: a visible re-equip, not a silent change
+  | { type: "equipModel"; agentId: string; model: string }
   // dev convenience: raise the budget so sleeping agents can be woken
   | { type: "topUp"; amountUsd: number };
 

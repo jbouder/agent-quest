@@ -17,6 +17,12 @@
   --color-muted: #7d8499;
   --color-heart: #e04848;
 
+  /* §5a model tiers — matches the NPC tunic colors in game/textures.ts */
+  --color-tier-haiku: #67c46b;
+  --color-tier-sonnet: #5a8fe0;
+  --color-tier-opus: #9a6fd6;
+  --color-tier-legendary: #d4a017;
+
   --font-quest: "Courier New", ui-monospace, monospace;
 }
 

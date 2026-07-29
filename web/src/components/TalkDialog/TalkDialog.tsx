@@ -49,13 +49,22 @@ export default function TalkDialog() {
               · {agent.model} · {STATUS_LABEL[agent.status]}
             </span>
           </h2>
-          <button
-            type="button"
-            onClick={close}
-            className="text-xs text-muted hover:text-foreground"
-          >
-            leave (Esc)
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setUi({ mode: "inventory", agentId: agent.id })}
+              className="text-xs text-primary hover:opacity-80"
+            >
+              🎒 inventory
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              className="text-xs text-muted hover:text-foreground"
+            >
+              leave (Esc)
+            </button>
+          </div>
         </div>
 
         <p className="mb-2 text-xs text-muted">quest: {agent.task}</p>
@@ -81,6 +90,28 @@ export default function TalkDialog() {
           </span>
           <span className="text-muted">· spent {formatUsd(agent.costUsd)}</span>
         </div>
+
+        {agent.quests.length > 0 && (
+          <div className="mb-2 max-h-24 overflow-y-auto rounded border border-border bg-background p-2 text-xs">
+            <p className="mb-1 text-muted">Quest log</p>
+            {agent.quests.map((quest) => (
+              <p
+                key={quest.title}
+                className={cn(
+                  quest.status === "completed" && "text-muted line-through",
+                  quest.status === "in_progress" && "text-accent",
+                )}
+              >
+                {quest.status === "completed"
+                  ? "☑"
+                  : quest.status === "in_progress"
+                    ? "◈"
+                    : "☐"}{" "}
+                {quest.title}
+              </p>
+            ))}
+          </div>
+        )}
 
         <div className="mb-2 max-h-32 overflow-y-auto rounded border border-border bg-background p-2 text-xs">
           {lines.length === 0 && (

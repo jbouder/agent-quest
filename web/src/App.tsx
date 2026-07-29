@@ -1,6 +1,9 @@
 import { useAtomValue } from "jotai";
 import GameCanvas from "@/components/GameCanvas";
 import Hud from "@/components/Hud";
+import InventoryDialog from "@/components/InventoryDialog";
+import JournalDrawer from "@/components/JournalDrawer";
+import Mirror from "@/components/Mirror";
 import SummonDialog from "@/components/SummonDialog";
 import TalkDialog from "@/components/TalkDialog";
 import Toasts from "@/components/Toasts";
@@ -16,11 +19,14 @@ export default function App() {
       <Hud />
       {ui.mode === "roam" && nearby === null && (
         <p className="pointer-events-none absolute bottom-3 left-3 text-xs text-muted">
-          WASD/arrows to move · walk to the portal to summon an agent
+          WASD/arrows to move · E to interact · M mirror · J journal
         </p>
       )}
+      <JournalDrawer />
       <SummonDialog />
       <TalkDialog />
+      <InventoryDialog />
+      <Mirror />
       <Toasts />
     </div>
   );

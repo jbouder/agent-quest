@@ -10,7 +10,9 @@ import {
 import { AgentSession } from "./agentSession";
 import { BudgetTracker } from "./budget";
 
-const MAX_CONCURRENT_AGENTS = 4; // §8: NPCs are cheap to look at, not to run
+// §8/§12: NPCs are cheap to look at, not to run — the village renders ~6
+// individually and camps the rest, but the server cap is the real limit.
+const MAX_CONCURRENT_AGENTS = Number(process.env.AGENT_QUEST_MAX_AGENTS ?? 8);
 
 export class SessionManager {
   private sessions = new Map<string, AgentSession>();
@@ -67,6 +69,9 @@ export class SessionManager {
         this.sessions
           .get(command.agentId)
           ?.resolvePermission(command.requestId, command.allow);
+        break;
+      case "equipModel":
+        void this.sessions.get(command.agentId)?.equipModel(command.model);
         break;
       case "topUp": {
         this.budget.topUp(command.amountUsd);
