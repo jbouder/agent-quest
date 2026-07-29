@@ -5,7 +5,7 @@
 Your repo is a village. Your agents are villagers. Walk up and talk to
 steer them, tap them to interrupt, and watch their context window drain
 like a health bar. Built with Phaser 3, React 19, and the Claude Agent
-SDK — see [DESIGN.md](./DESIGN.md) for the full vision (all four
+SDK — see [DESIGN.md](./docs/DESIGN.md) for the full vision (all four
 implementation phases are built).
 
 ![The village plaza](docs/screenshots/plaza.jpg)
