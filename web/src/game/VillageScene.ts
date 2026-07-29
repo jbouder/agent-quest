@@ -69,6 +69,44 @@ const EGGS: { id: string; x: number; y: number }[] = [
   { id: "wall", x: 60, y: 260 },
 ];
 
+/** Deterministic PRNG so the decoration layout is identical every load. */
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Circles decorations must stay out of (structures, eggs, district lots). */
+const KEEPOUT: { x: number; y: number; r: number }[] = [
+  { x: PLAZA.x, y: PLAZA.y, r: 210 },
+  { x: PORTAL.x, y: PORTAL.y, r: 90 },
+  { x: CAMP.x, y: CAMP.y, r: 90 },
+  { x: TAVERN.x, y: TAVERN.y, r: 120 },
+  { x: TOWER.x, y: TOWER.y, r: 120 },
+  { x: POND.x, y: POND.y, r: 100 },
+  { x: 110, y: 110, r: 90 }, // statues
+  { x: 1215, y: 430, r: 60 }, // old man
+  { x: 1070, y: 800, r: 60 }, // skeleton
+  { x: 60, y: 260, r: 60 }, // cracked rock
+  { x: 688, y: 648, r: 50 }, // gatekeeper post
+  ...DISTRICT_SPOTS.map((s) => ({ x: s.x, y: s.y, r: 120 })),
+];
+
+function nearStructure(x: number, y: number): boolean {
+  // the plaza-to-portal road
+  if (Math.abs(x - PLAZA.x) < 60 && y > PLAZA.y - 20 && y < PORTAL.y + 20) {
+    return true;
+  }
+  return KEEPOUT.some(
+    (k) => Phaser.Math.Distance.Between(x, y, k.x, k.y) < k.r,
+  );
+}
+
 const STATUS_ICON: Record<AgentStatus, string> = {
   summoning: "✨",
   idle: "",
@@ -112,6 +150,7 @@ class NpcView {
   ) {
     this.home = slot;
     const tier = modelTier(agent.model);
+    const shadow = scene.add.image(0, 1, "shadow").setScale(0.55, 0.45);
     this.body = scene.add.image(0, 0, `npc-${tier}`).setOrigin(0.5, 1);
     this.nameText = scene.add
       .text(0, -30, agent.label, {
@@ -158,6 +197,7 @@ class NpcView {
       .setVisible(false);
 
     this.container = scene.add.container(from.x, from.y, [
+      shadow,
       this.body,
       this.nameText,
       healthBg,
@@ -402,6 +442,8 @@ export class VillageScene extends Phaser.Scene {
   private camped = new Set<string>();
   private campBadge!: Phaser.GameObjects.Text;
   private campTent!: Phaser.GameObjects.Image;
+  private campShadow!: Phaser.GameObjects.Image;
+  private playerShadow!: Phaser.GameObjects.Image;
   // §1 districts
   private districtObjects: Phaser.GameObjects.GameObject[] = [];
   private districtGroup!: Phaser.Physics.Arcade.StaticGroup;
@@ -423,6 +465,10 @@ export class VillageScene extends Phaser.Scene {
     generateTextures(this);
     this.buildWorld();
 
+    this.playerShadow = this.add
+      .image(PLAZA.x, PLAZA.y + 131, "shadow")
+      .setScale(0.55, 0.45)
+      .setDepth(19);
     this.player = this.physics.add
       .sprite(PLAZA.x, PLAZA.y + 130, "player")
       .setOrigin(0.5, 1)
@@ -434,7 +480,8 @@ export class VillageScene extends Phaser.Scene {
     this.districtGroup = this.physics.add.staticGroup();
     this.physics.add.collider(this.player, this.districtGroup);
 
-    this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
+    // inset so the player stays out of the border tree line
+    this.physics.world.setBounds(34, 40, WORLD_W - 68, WORLD_H - 78);
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setZoom(1.6);
@@ -482,11 +529,34 @@ export class VillageScene extends Phaser.Scene {
   }
 
   private buildWorld(): void {
+    const rng = mulberry32(0x517e17);
     this.add.tileSprite(0, 0, WORLD_W, WORLD_H, "grass").setOrigin(0);
+
+    // break up the tiling with variant grass tiles on the same grid
+    for (let i = 0; i < 220; i++) {
+      const tx = Math.floor(rng() * (WORLD_W / 32)) * 32;
+      const ty = Math.floor(rng() * (WORLD_H / 32)) * 32;
+      this.add.image(tx, ty, rng() < 0.5 ? "grass-1" : "grass-2").setOrigin(0);
+    }
+
+    // paths get an ALttP-style darker packed-earth rim
+    const rim = this.add.graphics().setDepth(1);
+    rim.fillStyle(0x7d5f33);
+    rim.fillRect(PLAZA.x - 38, PLAZA.y - 6, 76, PORTAL.y - PLAZA.y + 12);
+    rim.fillRect(PLAZA.x - 150, PLAZA.y - 118, 300, 236);
     this.add
-      .tileSprite(PLAZA.x - 32, PLAZA.y, 64, PORTAL.y - PLAZA.y, "path")
-      .setOrigin(0.5, 0);
-    this.add.tileSprite(PLAZA.x, PLAZA.y, 288, 224, "path").setOrigin(0.5, 0.5);
+      .tileSprite(PLAZA.x, PLAZA.y, 64, PORTAL.y - PLAZA.y, "path")
+      .setOrigin(0.5, 0)
+      .setDepth(1);
+    this.add
+      .tileSprite(PLAZA.x, PLAZA.y, 288, 224, "path")
+      .setOrigin(0.5, 0.5)
+      .setDepth(1);
+
+    this.buildForestBorder(rng);
+    this.scatterDecorations(rng);
+
+    this.addShadow(PLAZA.x, PLAZA.y + 20, 1.15);
     this.add.image(PLAZA.x, PLAZA.y, "fountain").setDepth(4);
 
     const portal = this.add.image(PORTAL.x, PORTAL.y, "portal").setDepth(4);
@@ -501,7 +571,9 @@ export class VillageScene extends Phaser.Scene {
     });
 
     // §9a quest board, §9d tavern, §9e watchtower + scrying pool
+    this.addShadow(BOARD.x, BOARD.y + 25, 1.15);
     this.add.image(BOARD.x, BOARD.y, "board").setDepth(4);
+    this.addShadow(TAVERN.x, TAVERN.y + 41, 2.6);
     this.add.image(TAVERN.x, TAVERN.y, "tavern").setDepth(3);
     this.addLabel(TAVERN.x, TAVERN.y + 48, "tavern");
     this.add.image(TOWER.x, TOWER.y, "tower").setDepth(3);
@@ -510,12 +582,19 @@ export class VillageScene extends Phaser.Scene {
     // §15 — the delightful and slightly arbitrary
     this.add.image(POND.x, POND.y, "pond").setDepth(2);
     this.add.image(POND.x + 40, POND.y - 10, "duck").setDepth(3);
+    this.addSparkle(POND.x - 20, POND.y + 4);
+    this.addSparkle(POND.x + 14, POND.y - 12);
+    this.addSparkle(PLAZA.x - 6, PLAZA.y - 4);
+    this.addShadow(80, 130, 0.75);
+    this.addShadow(140, 130, 0.75);
     this.add.image(80, 108, "statue").setDepth(3);
     this.add.image(140, 108, "statue").setDepth(3);
     this.addLabel(80, 132, "Claude 1");
     this.addLabel(140, 132, "Claude 2");
+    this.addShadow(1215, 438, 0.55);
     this.add.image(1215, 424, "oldman").setDepth(3);
     this.add.image(1070, 796, "bones").setDepth(3);
+    this.addShadow(60, 268, 0.7);
     this.add.image(60, 254, "rock").setDepth(3);
 
     // §14 the gatekeeper — appears when the classifier holds the gates
@@ -525,6 +604,9 @@ export class VillageScene extends Phaser.Scene {
       .setVisible(false);
 
     // §12 camp: hidden until someone actually has to pitch a tent.
+    this.campShadow = this.addShadow(CAMP.x, CAMP.y + 19, 1.25).setVisible(
+      false,
+    );
     this.campTent = this.add
       .image(CAMP.x, CAMP.y, "tent")
       .setDepth(4)
@@ -540,6 +622,75 @@ export class VillageScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(5)
       .setVisible(false);
+  }
+
+  private addShadow(
+    x: number,
+    y: number,
+    scale: number,
+  ): Phaser.GameObjects.Image {
+    return this.add
+      .image(x, y, "shadow")
+      .setScale(scale, scale * 0.8)
+      .setDepth(2);
+  }
+
+  private addSparkle(x: number, y: number): void {
+    const sparkle = this.add.image(x, y, "sparkle").setDepth(3).setAlpha(0);
+    this.tweens.add({
+      targets: sparkle,
+      alpha: { from: 0, to: 0.9 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      repeatDelay: 1100,
+      delay: (x * 7 + y * 3) % 900,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  /** ALttP frames its maps: a tree line rings the whole world. */
+  private buildForestBorder(rng: () => number): void {
+    const step = 46;
+    const jitter = () => (rng() - 0.5) * 14;
+    for (let x = 20; x < WORLD_W; x += step) {
+      this.add.image(x + jitter(), 18 + jitter(), "tree").setDepth(8);
+      this.add.image(x + jitter(), WORLD_H - 14 + jitter(), "tree").setDepth(8);
+    }
+    for (let y = 60; y < WORLD_H - 40; y += step) {
+      this.add.image(16 + jitter(), y + jitter(), "tree").setDepth(8);
+      this.add.image(WORLD_W - 16 + jitter(), y + jitter(), "tree").setDepth(8);
+    }
+  }
+
+  /** Tufts, flowers, bushes, and the odd tree fill the empty grass. */
+  private scatterDecorations(rng: () => number): void {
+    const place = (
+      count: number,
+      margin: number,
+      fn: (x: number, y: number) => void,
+    ) => {
+      let placed = 0;
+      let attempts = 0;
+      while (placed < count && attempts < count * 30) {
+        attempts += 1;
+        const x = margin + rng() * (WORLD_W - margin * 2);
+        const y = margin + rng() * (WORLD_H - margin * 2);
+        if (nearStructure(x, y)) continue;
+        fn(x, y);
+        placed += 1;
+      }
+    };
+    place(46, 70, (x, y) => this.add.image(x, y, "tuft").setDepth(2));
+    place(22, 70, (x, y) => this.add.image(x, y, "flower").setDepth(2));
+    place(14, 80, (x, y) => {
+      this.addShadow(x, y + 9, 0.55);
+      this.add.image(x, y, "bush").setDepth(3);
+    });
+    place(7, 120, (x, y) => {
+      this.addShadow(x, y + 26, 0.95);
+      this.add.image(x, y, "tree").setDepth(8);
+    });
   }
 
   private addLabel(
@@ -575,6 +726,7 @@ export class VillageScene extends Phaser.Scene {
     districts.forEach((name, i) => {
       const spot = DISTRICT_SPOTS[i];
       if (!spot) return;
+      const shadow = this.addShadow(spot.x, spot.y + 40, 2.1);
       const house = this.districtGroup.create(
         spot.x,
         spot.y,
@@ -582,7 +734,7 @@ export class VillageScene extends Phaser.Scene {
       ) as Phaser.Physics.Arcade.Sprite;
       house.setDepth(3).setSize(90, 48).setOffset(3, 30);
       const label = this.addLabel(spot.x, spot.y + 52, `${name}/`);
-      this.districtObjects.push(house, label);
+      this.districtObjects.push(shadow, house, label);
       this.districtPositions.set(name, { x: spot.x, y: spot.y + 84 });
     });
   }
@@ -657,6 +809,7 @@ export class VillageScene extends Phaser.Scene {
   private updateCamp(): void {
     const count = this.camped.size;
     this.campTent.setVisible(count > 0);
+    this.campShadow.setVisible(count > 0);
     this.campBadge.setVisible(count > 0);
     if (count > 0) this.campBadge.setText(String(count));
   }
@@ -856,6 +1009,8 @@ export class VillageScene extends Phaser.Scene {
 
     this.updateMovement(roaming);
     this.updateInteraction(roaming);
+    this.playerShadow.setPosition(this.player.x, this.player.y + 1);
+    this.playerShadow.setAlpha(this.player.alpha);
   }
 
   private updateMovement(roaming: boolean): void {
