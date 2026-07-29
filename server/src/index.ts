@@ -1,7 +1,16 @@
 import { createServer } from "node:http";
+import { join } from "node:path";
+import { config as loadEnv } from "dotenv";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ClientCommand, ServerEvent } from "../../shared/protocol";
+import { findRepoRoot } from "./repo";
 import { SessionManager } from "./sessionManager";
+
+// One .env at the repo root configures everything (see .env.example).
+loadEnv({
+  path: [join(findRepoRoot(process.cwd()), ".env"), ".env"],
+  quiet: true,
+});
 
 const PORT = Number(process.env.AGENT_QUEST_PORT ?? 8787);
 const BUDGET_USD = Number(process.env.AGENT_QUEST_BUDGET_USD ?? 5);

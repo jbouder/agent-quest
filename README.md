@@ -52,17 +52,18 @@ three are noted in DESIGN.md and wait on upstream support.
 ## Running it
 
 ```sh
-export ANTHROPIC_API_KEY=sk-ant-…   # the SDK authenticates with an API key
 npm install
-npm run dev        # control server on :8787, game on :5173
+cp .env.example .env   # optional — all settings have defaults
+npm run dev            # control server on :8787, game on :5173
 ```
 
 Open http://localhost:5173, walk south to the glowing portal, press `E`.
 
-Optional env for the server:
-
-- `AGENT_QUEST_BUDGET_USD` — starting player budget (default 5)
-- `AGENT_QUEST_PORT` — WebSocket port (default 8787)
+Configuration lives in a single `.env` at the repo root (see
+[.env.example](./.env.example)): demo mode, budget, agent cap, port, and
+`ANTHROPIC_API_KEY` (if unset, the SDK falls back to this machine's
+Claude Code credentials). Set `AGENT_QUEST_DEMO=1` to run the whole game
+on scripted fake agents with zero real spend.
 
 ## Layout
 
