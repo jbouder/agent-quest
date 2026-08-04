@@ -183,64 +183,6 @@ export function generateTextures(scene: Phaser.Scene): void {
   g.generateTexture("tree", 48, 56);
   g.clear();
 
-  // house: outlined walls, two-tone roof with ridge highlight, eave shadow
-  g.fillStyle(OUTLINE);
-  g.fillRect(3, 27, 90, 54);
-  g.fillStyle(0x6b4f35);
-  g.fillRect(4, 28, 88, 52);
-  g.fillStyle(0x5a4230);
-  g.fillRect(4, 28, 88, 8); // eave shadow
-  g.fillStyle(0x7d5e40);
-  g.fillRect(4, 74, 88, 6); // lit base course
-  g.fillStyle(OUTLINE);
-  g.fillTriangle(-2, 32, 48, -2, 98, 32);
-  g.fillStyle(0x8f2f2f);
-  g.fillTriangle(0, 30, 48, 0, 96, 30);
-  g.fillStyle(0xb04848);
-  g.fillTriangle(10, 26, 48, 2, 52, 6); // roof highlight
-  g.fillStyle(0x6e2222);
-  g.fillTriangle(48, 22, 96, 30, 40, 30); // roof shading
-  // door with frame + windows with frames
-  g.fillStyle(OUTLINE);
-  g.fillRect(38, 50, 20, 30);
-  g.fillStyle(0x3a2c1e);
-  g.fillRect(40, 52, 16, 28);
-  g.fillStyle(0xd4a017);
-  g.fillRect(52, 66, 2, 4);
-  g.fillStyle(OUTLINE);
-  g.fillRect(12, 42, 16, 16);
-  g.fillRect(68, 42, 16, 16);
-  g.fillStyle(0xf2d16b);
-  g.fillRect(14, 44, 12, 12);
-  g.fillStyle(0xc9a343);
-  g.fillRect(14, 50, 12, 2);
-  g.fillRect(19, 44, 2, 12);
-  g.fillStyle(0xf2d16b);
-  g.fillRect(70, 44, 12, 12);
-  g.fillStyle(0xc9a343);
-  g.fillRect(70, 50, 12, 2);
-  g.fillRect(75, 44, 2, 12);
-  g.generateTexture("house", 96, 82);
-  g.clear();
-
-  // portal: outlined stone ring + layered glow
-  g.fillStyle(OUTLINE);
-  g.fillEllipse(24, 56, 48, 18);
-  g.fillStyle(STONE.base);
-  g.fillEllipse(24, 56, 44, 14);
-  g.fillStyle(STONE.light);
-  g.fillEllipse(24, 54, 34, 8);
-  g.fillStyle(0x4a2e8a);
-  g.fillEllipse(24, 30, 34, 52);
-  g.fillStyle(0x7b4fd6);
-  g.fillEllipse(24, 30, 28, 44);
-  g.fillStyle(0xb79af0);
-  g.fillEllipse(24, 30, 16, 30);
-  g.fillStyle(0xe8ddff);
-  g.fillEllipse(24, 28, 6, 14);
-  g.generateTexture("portal", 48, 64);
-  g.clear();
-
   // fountain: stone rim in three tones + sparkling water
   g.fillStyle(OUTLINE);
   g.fillCircle(24, 24, 24);
@@ -471,6 +413,7 @@ export function generateTextures(scene: Phaser.Scene): void {
   character(scene, "player", 0x2e7d32, 0x6b4a2f);
   character(scene, "oldman", 0x8a8a9a, 0xe8e3d0);
   character(scene, "gatekeeper", 0x8f2f2f, 0x2c2c34);
+  character(scene, "guide", 0x2d8a80, 0xe8e3d0); // §18 tutorial guide
   for (const [tier, color] of Object.entries(TIER_COLORS)) {
     character(scene, `npc-${tier}`, color, 0x2c2c34);
   }

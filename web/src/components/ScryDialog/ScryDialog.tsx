@@ -40,8 +40,8 @@ export default function ScryDialog() {
       <div className="w-[480px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4">
         <h2 className="mb-1 text-accent">🔮 The Scrying Pool</h2>
         <p className="mb-3 text-xs text-muted">
-          Ask, and a scout steps through the portal to search the wider world.
-          (A real Haiku agent — it costs a few coins of budget.)
+          Ask, and a scout climbs the watchtower to search the wider world. (A
+          real Haiku agent — it costs a few coins of budget.)
         </p>
         <div className="flex gap-2">
           <input

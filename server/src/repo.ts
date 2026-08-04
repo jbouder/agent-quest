@@ -28,7 +28,7 @@ export function findRepoRoot(start: string): string {
   return start;
 }
 
-/** §1/§12 — one house per top-level directory, capped to stay readable. */
+/** Top-level directories, for journal text and quest scans (§12). */
 export function listDistricts(root: string, cap = 8): string[] {
   try {
     return readdirSync(root, { withFileTypes: true })
@@ -60,7 +60,8 @@ export function readTome(cwd: string): string | null {
 }
 
 /**
- * §1 — map a tool-call file path to its district (top-level directory).
+ * §12 — map a tool-call file path to its top-level directory, so module
+ * context can surface as journal text (the geographic mapping was dropped).
  * Returns null for paths outside the repo or files at the root.
  */
 export function districtOf(
@@ -161,7 +162,7 @@ export async function scanQuestBoard(root: string): Promise<{
         kind: "docs",
         icon: "❓",
         title: `A villager is confused about ${district}/`,
-        detail: "No README in this district.",
+        detail: "No README in this directory.",
         suggestedTask: `Write a concise README.md for the ${district}/ directory explaining what it contains and how it fits into the project.`,
       });
     }

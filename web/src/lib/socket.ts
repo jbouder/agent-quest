@@ -5,7 +5,6 @@ import {
   connectedAtom,
   defaultCwdAtom,
   demoModeAtom,
-  districtsAtom,
   gameStore,
   lastSteerAtom,
   playerAtom,
@@ -35,6 +34,18 @@ export function localToast(
   text: string,
 ): void {
   pushToast(level, text);
+}
+
+/**
+ * §18 contextual signposts — a one-line hint the first time something new
+ * happens, remembered across sessions. Clear the aq-hint-* localStorage keys
+ * (or replay the tutorial) to see them again.
+ */
+export function hintOnce(id: string, text: string): void {
+  const key = `aq-hint-${id}`;
+  if (typeof localStorage === "undefined" || localStorage.getItem(key)) return;
+  localStorage.setItem(key, "1");
+  pushToast("info", text);
 }
 
 function pushToast(level: "info" | "warn" | "error", text: string): void {
@@ -70,11 +81,27 @@ function handleEvent(event: ServerEvent): void {
     case "snapshot":
       safeSet(() => gameStore.set(playerAtom, event.player));
       safeSet(() => gameStore.set(defaultCwdAtom, event.defaultCwd));
-      safeSet(() => gameStore.set(districtsAtom, event.districts));
       safeSet(() => gameStore.set(sideQuestsAtom, event.sideQuests));
       safeSet(() => gameStore.set(recentCommitsAtom, event.recentCommits));
       safeSet(() => gameStore.set(demoModeAtom, event.demoMode));
       safeSet(() => gameStore.set(agentsAtom, event.agents));
+      // §18 — teach features the first time they actually matter.
+      if (event.agents.some((a) => a.status === "blocked_permission")) {
+        hintOnce(
+          "permission",
+          "❗ An agent awaits your judgment — talk to it, then 🖐 allow or 🛡 deny.",
+        );
+      }
+      if (
+        event.agents.some((a) =>
+          a.tasks.some((t) => t.kind === "subagent" && t.status !== "running"),
+        )
+      ) {
+        hintOnce(
+          "subagent-return",
+          "📜 A subagent returned — its scroll passed the grader's gate before reaching its lead.",
+        );
+      }
       break;
     case "sessions":
       safeSet(() => gameStore.set(savedSessionsAtom, event.sessions));

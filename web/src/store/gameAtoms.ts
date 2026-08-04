@@ -29,9 +29,6 @@ export const defaultCwdAtom = atom<string>("");
 
 export const connectedAtom = atom<boolean>(false);
 
-/** §1/§12 — the repo's top-level directories, one house each. */
-export const districtsAtom = atom<string[]>([]);
-
 /** §9a — what's posted on the quest board. */
 export const sideQuestsAtom = atom<SideQuest[]>([]);
 
@@ -41,10 +38,10 @@ export const recentCommitsAtom = atom<string[]>([]);
 /** §16 sandbox — the server is running fake agents on fake budget. */
 export const demoModeAtom = atom<boolean>(false);
 
-/** §8a — saved sessions offered for resume at the portal. */
+/** §8a — saved sessions offered for resume in the summon dialog. */
 export const savedSessionsAtom = atom<SessionSummary[]>([]);
 
-/** Prefills the portal's quest box (used by the quest board's Accept). */
+/** Prefills the summon dialog's quest box (used by the quest board's Accept). */
 export const summonPrefillAtom = atom<string>("");
 
 /** §15 rubber duck — your last steering instruction, repeated back. */
@@ -73,7 +70,8 @@ export const appendJournalAtom = atom(null, (get, set, line: JournalLine) => {
   );
 });
 
-export const journalOpenAtom = atom<boolean>(false);
+/** §6a — the Chronicle: the consolidated cross-agent journal drawer. */
+export const chronicleOpenAtom = atom<boolean>(false);
 
 export interface Toast {
   id: number;
@@ -92,19 +90,23 @@ export type UiMode =
   | { mode: "board" }
   | { mode: "tavern" }
   | { mode: "scry" }
-  | { mode: "cheat" };
+  | { mode: "cheat" }
+  // §18 — the guide's walkthrough and the searchable full reference
+  | { mode: "tutorial" }
+  | { mode: "help" };
 
 export const uiModeAtom = atom<UiMode>({ mode: "roam" });
 
 /** Set by the Phaser scene: what's in interaction range right now. */
 export type Interactable =
-  | { kind: "portal" }
   | { kind: "npc"; agentId: string }
   | { kind: "camp" }
   | { kind: "board" }
   | { kind: "tavern" }
   | { kind: "scry" }
   | { kind: "egg"; eggId: string }
+  // §18 — the guide NPC by the fountain
+  | { kind: "guide" }
   | null;
 
 export const nearbyAtom = atom<Interactable>(null);
@@ -121,7 +123,7 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
       connectedAtom,
       defaultCwdAtom,
       uiModeAtom,
-      journalOpenAtom,
+      chronicleOpenAtom,
       warpTargetAtom,
     },
     get: () => ({

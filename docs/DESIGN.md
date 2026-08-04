@@ -17,9 +17,43 @@ signal or a real control action.
 
 - Classic top-down village, camera-locked to the player.
 - WASD/arrow movement, bird's-eye view.
-- Village layout doubles as a map of the repo — houses/districts
-  represent modules or directories, so an agent visibly "entering" the
-  auth module is literally an NPC walking to that house.
+- The village is a single shared space, not a map of the repo. Earlier
+  drafts tied houses/districts to project directories; that mapping
+  added rendering complexity without adding real understanding (see
+  §12) and has been dropped. What matters is *what an agent is doing*
+  (thought bubble, journal, quest log), not *where it's standing*.
+
+### 1a. A bigger world, multiple areas
+
+The village square doesn't have to be the whole world — it's the hub.
+Expanding outward into named areas gives everything already in this doc
+room to breathe instead of competing for the same patch of ground:
+
+- **Village Square** — the hub. Quest board (§9a), gatekeeper at the
+  edge (§14), central and easy to return to.
+- **The Shopping District** — the shops (§5b), browsable at leisure,
+  separate from the busier square.
+- **The Tavern** — learning/news/music/garden (§9d), already framed as
+  a place you deliberately walk to for downtime; benefits from feeling
+  a little removed from the main hustle.
+- **The Ruins** — tech debt (§9b), naturally suited to being its own
+  overgrown area at the world's edge rather than a single structure in
+  the square.
+- **The Watchtower** — the Scrying Pool (§9e), thematically fits being
+  set apart and elevated, away from the day-to-day village.
+- **The Frontier** — where random encounters, the traveling merchant,
+  and escort quests (§9b) play out; open space rather than fixed
+  buildings, since these are transient by nature.
+- **The Arena** — raid bosses (§9b) get a dedicated space, so a
+  large-scale multi-agent effort doesn't visually collide with normal
+  village life happening nearby.
+- **The Docks** — the fishing/idle-timer wait (§9b) for long builds or
+  slow CI, naturally suited to being its own quiet spot.
+
+A bigger world also gives the agent-cap/camp-clustering behavior (§12)
+more room — background agents can cluster near whichever area is
+thematically relevant to their task rather than all stacking in one
+square once the count climbs.
 
 ## 2. Two separate resources (the key design decision)
 
@@ -110,6 +144,34 @@ inventory.
   drains the health/budget meters faster once running, matching real
   per-token cost differences across tiers.
 
+### 5b. Shops (installing skills, plugins, MCPs)
+
+If the inventory screen shows what an agent *has*, the shops are where
+you get more of it — a real marketplace browser dressed as Zelda-style
+shops, since this is meant to be the one-stop-shop for the whole Claude
+Code setup, not just a viewer.
+
+- **A few specialty shops rather than one generic store**, matching the
+  categories that already exist as separate inventory sections (§5):
+  a Skills shop, a Plugin shop, and an MCP/connector shop — each with
+  its own shopkeeper NPC and browsable shelf of items pulled from
+  Anthropic's actual registry.
+- **Browsing = walking the shelves.** Each item shows its real
+  description, and whether it's already installed (already in your
+  inventory) vs. available to add.
+- **"Buying" = installing.** No real currency needs to be spent here —
+  installing a skill or plugin doesn't cost tokens — so the purchase
+  flourish is cosmetic (a chime, an item added to inventory) rather than
+  drawing down mana. Mana stays reserved for things that cost real spend
+  (§8, §12), so the shop doesn't muddy that signal.
+- **Uninstalling = selling back**, for symmetry — removes the item from
+  the inventory grid (§5) the same way it would from a real Claude Code
+  configuration.
+- **New releases get a "just in" shelf.** Since Anthropic's skill/plugin/
+  MCP catalog changes over time, the shopkeeper can visibly restock —
+  a small, honest way to surface "here's what's new" without a
+  separate changelog screen.
+
 ## 6. Quest log & Journal
 
 - **Quest log** = the agent's live task/plan list (maps to a todo/plan
@@ -118,6 +180,25 @@ inventory.
   permission request, in order. Toggle-able, not always on-screen; the
   "boring but essential" telemetry view for when you actually need to
   debug something.
+
+### 6a. The Chronicle (consolidated cross-agent journal)
+
+The per-agent Journal above is scoped to one NPC at a time — useful
+once you know which agent you care about, less useful when the
+question is "what's happened across everything, recently." The
+Chronicle is a single, always-available feed merging every agent's
+journal entries into one chronological stream:
+
+- **One list, filterable by agent, status, or event type** (errors,
+  permission requests, completions) rather than needing to visit each
+  NPC individually to piece together a picture.
+- **This becomes the actual answer to "what happened while I was in the
+  Tavern/side-questing/away"** — more complete than the companion
+  familiar's short chirp (§9), for when you want the full record rather
+  than a summary.
+- **Reachable from the pause menu**, not tied to any location in the
+  village — this is core visibility infrastructure, not a place you
+  walk to.
 
 ## 7. Weapons & tools (control actions)
 
@@ -139,13 +220,83 @@ tool call has to unwind first. Worth reflecting as a brief "flinch"
 animation rather than an instant freeze, so the UI never lies about
 what's actually happening.
 
+### 7a. Interaction model (simplified)
+
+Proximity-plus-keypress isn't the problem on its own — needing to
+remember a specific, arbitrary key (like "E") for it is. Simplifying to
+support both click/tap *and* walk-up-and-press-a-button, with a single
+consistent button rather than a memorized one:
+
+- **Click/tap directly on an NPC or object** works as one path — no
+  walking required if you're already positioned to point at it.
+- **Walking up and pressing a single, consistent interact button**
+  works as the other — same action, keyboard/controller-friendly, no
+  mouse required. The button should be the same one every time (e.g.
+  whatever the platform's natural "confirm/interact" button is —
+  Space/Enter on keyboard, A/X on controller) rather than something
+  that has to be looked up, and a small contextual prompt appears near
+  the NPC/object once you're in range so it's never a guess whether
+  you're close enough.
+- **Global overlays (Mirror, Inventory, Chronicle, pause menu) open from
+  persistent on-screen buttons/icons, not memorized hotkeys.** These
+  aren't tied to standing anywhere, so they shouldn't require
+  remembering a letter — a small always-visible icon row (or a single
+  pause-menu button that fans out to the rest) does this more
+  discoverably.
+- **Additional keyboard shortcuts can still exist as optional
+  accelerators** for people who want them (a settings-level list,
+  covered by the full reference in §18), but nothing should be *only*
+  reachable by remembering an arbitrary key — click/tap and the single
+  consistent interact button are always the baseline paths.
+- This also simplifies the summon flow in §8 further: opening the
+  pause menu and selecting the summon item works the same as any other
+  menu action, rather than introducing its own separate interaction
+  pattern.
+
+### 7b. Slashing (environmental interaction)
+
+The sword already exists as the interrupt action (§7) — giving it a
+second, context-sensitive use for the environment itself, rather than
+adding a new control:
+
+- **Same button, different target.** Swinging at an NPC interrupts it
+  (§7); swinging at grass, a pot, a crate, or other scattered
+  environmental objects cuts or breaks it instead. What you're aimed at
+  (via the click/tap-or-walk-up model in §7a) decides which happens —
+  no separate mode to switch into.
+- **Scattered through the bigger world (§1a)**, especially areas with
+  room to wander — the Frontier, the edges of the Ruins, patches around
+  the Docks — rather than clustered right in the busy Village Square.
+- **Rewards are small and mostly cosmetic**: an occasional mana pickup,
+  a cosmetic drop, or — most of the time — nothing, same as classic
+  grass-cutting. The reward doesn't need to be meaningful every time for
+  the action to be satisfying.
+- **A natural home for some of the Easter eggs (§15).** The "push on a
+  wall enough times" secret fits just as well as "slash the right patch
+  of grass" — same spirit, doesn't need its own separate rule from
+  what's already in §15.
+- **The Ruins (§9b) get a thematic tie-in**: cutting back overgrowth
+  there with the sword is a small, literal, satisfying gesture toward
+  "clearing" tech debt, even though the actual clearing happens through
+  the refactor quest itself — the slashing is flavor on top, not a
+  substitute for the real mechanic.
+
 ## 8. Summoning agents from the app
 
-- A portal / pedestal in the village. Walk up, "talk" to it, get a
-  dialogue-style prompt box: what should it do, which directory, any
-  starting options.
-- Confirms and spawns — the NPC walks in from the portal with an
-  entrance animation.
+Walking somewhere to start something you want *right now* adds friction
+without adding meaning — unlike, say, walking up to an NPC to talk to
+it, where the walk matches the real action (engaging that specific
+session). Summoning a brand-new agent isn't tied to a place, so it
+shouldn't require one:
+
+- **A summon item, usable from the pause menu, from anywhere.** Think a
+  Scroll of Summoning or an Ocarina — open the menu, select it, get the
+  same dialogue-style prompt box (what should it do, which directory,
+  any starting options) without needing to walk to a fixed location
+  first.
+- Confirms and spawns — the NPC still gets an entrance
+  animation/appearance in the village, just without a required trip
+  beforehand.
 - Worth surfacing a permission-mode choice at summon time (auto-approve
   safe tools vs. prompt-through-UI) and a concurrency cap, since NPCs
   are cheap to look at but not cheap to run.
@@ -153,9 +304,15 @@ what's actually happening.
   token spend, reinforcing the cost-awareness angle rather than treating
   agents as free.
 
-### 8a. Other ways an NPC can appear (not just the portal)
+(Earlier drafts placed this at a physical portal you had to walk to —
+dropped for the same reason as the repo-village mapping in §1: it added
+a location without adding real meaning, since there's nothing about
+*where* you stand that should affect *whether* you can start a new
+agent.)
 
-The portal isn't the only entry point — Claude Code sessions can
+### 8a. Other ways an NPC can appear (not just summoning)
+
+The summon menu isn't the only entry point — Claude Code sessions can
 originate outside Agent Quest entirely, and both real paths are worth
 supporting:
 
@@ -184,8 +341,6 @@ supporting:
 The design tension worth solving: the world should feel alive even when
 you're not actively managing agents.
 
-- **Repo-as-village**: NPCs visibly walk between houses/districts as
-  they touch different parts of the codebase.
 - **Random encounters = real repo events** — a new PR, a failing CI
   run — surfaced as obstacles/encounters you engage with directly.
 - **Companion familiar**: a small creature that follows you and chirps
@@ -207,11 +362,12 @@ encounter — keeps you in control of what actually pulls your attention.
 
 ### 9b. Side quest types
 
-- **Overgrown ruins = tech debt.** A district that hasn't been touched
-  in a long time visibly decays — vines, cracked stone. Clearing it
-  (a refactor task) restores the buildings. Gives long-neglected code a
-  visible, mildly guilt-inducing presence instead of staying invisible
-  until it breaks.
+- **Overgrown ruins = tech debt.** A standing ruin in the village whose
+  overgrowth (vines, cracked stone) reflects overall tech-debt signals
+  — age of untouched code, size of the backlog, whatever metric fits.
+  Clearing quests posted from it (refactor tasks) restore it in stages.
+  Gives long-neglected code a visible, mildly guilt-inducing presence
+  instead of staying invisible until it breaks.
 - **Weeds on the path = stale branches.** Branches sitting unmerged for
   weeks show up as overgrowth blocking a road. Cleaning them up (merge,
   rebase, or delete) clears the path.
@@ -223,9 +379,9 @@ encounter — keeps you in control of what actually pulls your attention.
   beating it (rerunning/fixing the test) doesn't always stick the first
   time — matches the actual annoying nature of flaky tests better than
   a normal fixed encounter.
-- **Villager with a question mark = documentation gaps.** An NPC in a
-  district stands around confused until someone (an agent or you)
-  writes the missing docs for that module, then goes back to their
+- **Villager with a question mark = documentation gaps.** An NPC stands
+  around confused, labeled with whatever module or file lacks docs,
+  until someone (an agent or you) writes them — then goes back to their
   business.
 - **Bounty board = security/lint findings.** Each finding posts as a
   bounty with a small reward (mana or a cosmetic) for clearing it —
@@ -316,7 +472,7 @@ bag worth keeping in mind for later, not fully specced:
   the currently-equipped model tier (§5a) glowing brightly by contrast.
 - An old man in a cave who hands you a cosmetic shield with a line like
   "it's dangerous to `git push --force` alone — take this."
-- A skeleton in the overgrown-ruins tech-debt district (§9b) wearing a
+- A skeleton in the overgrown-ruins tech-debt structure (§9b) wearing a
   name tag that just says "TODO: fix later."
 - A rubber duck NPC by a pond that, if you talk to it, just repeats your
   last steering instruction back to you — actual rubber-duck debugging,
@@ -338,8 +494,8 @@ stay honest about what it actually does.
 - **Noclip** — fly over the village ignoring collision/walls, purely
   cosmetic, just for getting around fast or admiring the map.
 - **Speed boost** — temporary faster movement, purely cosmetic.
-- **Level select** — jump straight to the Mirror (§4), or teleport to
-  any district by name, skipping the walk.
+- **Level select** — jump straight to the Mirror (§4), or teleport
+  directly to any named agent, skipping the walk.
 - **Reveal map** — light up all Easter eggs (§15) and hidden
   interactions at once, for anyone who wants to see everything without
   hunting.
@@ -370,43 +526,57 @@ stakes" is a separate sandbox/demo mode running against fake budget
 entirely — for showing the game off — rather than a cheat applied to
 real agents.
 
-## 17. Implementation phases
+## 17. Enhancement plan
 
-Everything above is the full vision. Building it in four phases, each
-one a genuinely usable milestone on its own rather than a partial demo.
+Phases 1–4 are implemented. This is no longer a from-scratch build plan
+— it's the roadmap for what comes next, on top of a working tool.
 
-### Phase 1 — Core loop
-The minimum that makes this a real tool, not a mockup: world +
-movement (§1), a single entry point for agents (portal spawn only,
-§8), NPC status animation and health-as-context (§2, §3), player
-budget/hearts (§2), and the core control actions — talk/steer, sword
-(interrupt), resume, dismiss (§7). No Mirror, no inventory, no side
-quests yet. Success looks like: you can summon one real agent, watch
-it work, stop it, steer it, and see it sleep when budget runs out.
+### Shipped
 
-### Phase 2 — Visibility depth
-The observability payoff, once the core loop is solid: the Mirror
-(§4), Inventory with skills/plugins and model-as-equipment (§5, §5a),
-Quest log and Journal (§6), permission shield/palm actions (§7), and
-support for multiple concurrent NPCs with the agent-cap/camp-clustering
-behavior (§12). This is the phase where the tool becomes genuinely
-more useful than a terminal for understanding what's going on.
+- **Phase 1 — Core loop.** World + movement, summoning, NPC status/
+  health-as-context, player budget/hearts, core control actions
+  (talk/steer, interrupt, resume, dismiss).
+- **Phase 2 — Visibility depth.** The Mirror, Inventory with skills/
+  plugins and model-as-equipment, Quest log, Journal, permission
+  actions, multi-agent support with camp-clustering.
+- **Phase 3 — A living world.** Quest board and automated side quest
+  types, trophies and the rewind mechanic, subagent lifecycle, hooks/
+  Auto-Mode/plan-mode/background-task/memory-tome mappings.
+- **Phase 4 — Depth & delight.** Resume/live-attach entry points, the
+  Tavern, the Scrying Pool, Easter eggs (§15 — kept exactly as
+  designed, no changes), cheat codes.
+- **Enhancement A — Simplified interaction model (§7a).** Direct
+  click/tap on NPCs and objects, one consistent interact button
+  (Space/Enter), and persistent on-screen buttons for the global
+  overlays — including the Chronicle (§6a). Landed together with the
+  doc revisions it was built against: repo-as-village dropped (§12)
+  and summoning moved off the portal into the menu (§8).
+- **Enhancement B — Tutorials & onboarding (§18).** Guide NPC by the
+  fountain with a skippable, replayable tour built around the new
+  click-based interactions, first-time contextual signposts, and a
+  searchable full reference.
 
-### Phase 3 — A living world
-Everything that makes the village feel alive beyond a single agent:
-repo-as-village top-level mapping (§1, §12), the quest board and
-automated side quest types (§9a, §9b), trophies and the rewind
-mechanic (§9, §9c), subagent lifecycle with return/grader-gate/batch
-resolution (§13), and the additional real-feature mappings — hooks as
-wards, the Auto Mode gatekeeper, plan-mode-as-draft-quest, background
-task campfires, memory tomes (§14).
+### Upcoming phases
 
-### Phase 4 — Depth & delight
-The rest: alternate entry points via resume and live attach (§8a), the
-Tavern (§9d), the Scrying Pool (§9e), Easter eggs (§15), cheat codes
-including god-mode-as-Auto-Mode (§16), and a sandbox/demo mode running
-on fake budget. Nothing here blocks daily usefulness — it's what turns
-a solid tool into one that's genuinely fun to spend time in.
+- **Phase 5 — World expansion & Map (§1a, §20).** Grow beyond a single
+  village square into named areas (Shopping District, Tavern, Ruins,
+  Watchtower, Frontier, Arena, Docks), plus a dedicated Map screen for
+  discovery, fast travel, and live pins. Positioned before Shops/
+  Customization since those and other later features (a bigger shop
+  district, more elaborate customization surfaces) benefit from having
+  room to live in a larger world rather than being squeezed into one
+  screen.
+- **Phase 6 — Shops & marketplace (§5b).** Browsing and installing
+  skills, plugins, and MCP connectors from Anthropic's registry through
+  in-world shops, now with their own district (§1a). Additive on top
+  of a stable core — genuinely useful, not required for managing agents
+  already configured.
+- **Phase 7 — Customization & extensibility (§19).** The in-app editor
+  surface, scoped/reversible changes, and the error boundary with
+  in-world crash recovery. Deliberately last: highest-risk phase
+  (arbitrary changes to a running tool), so it should land once
+  everything it could break — including the simplified interaction
+  model and the larger world — is itself stable.
 
 ## 10. Data model (conceptual)
 
@@ -433,8 +603,8 @@ an agent did; it can't stop what it's doing. Three paths into that
 control layer, all converging on the same sword/shield/wand/bow action
 set once an NPC exists:
 
-1. **Spawn via the portal** (§8) — Agent Quest starts the session and
-   holds the handle from the beginning.
+1. **Spawn via the summon menu** (§8) — Agent Quest starts the session
+   and holds the handle from the beginning.
 2. **Resume a finished session** (§8a) — Agent Quest becomes the sole
    writer of a saved conversation once the original process has exited.
 3. **Attach to a live session** (§8a) — Agent Quest takes over input
@@ -464,13 +634,14 @@ The inn/bed metaphor becomes a state overlay on their current spot, not
 an actual location change — simpler to implement and keeps spatial
 continuity.
 
-**Repo-as-village stays literal only at the top level.** One
-house/district per top-level directory or module. Below that, the
-mapping is implied, not rendered — an agent "enters" a district, and
-the specific file it's touching surfaces as text in the thought bubble
-or journal rather than as a walkable building. This keeps the spatial
-metaphor legible instead of trying to render an entire file tree as
-geography.
+**Repo-as-village mapping: dropped entirely.** An earlier pass
+considered a literal top-level mapping (one house/district per
+directory or module). Revisited and removed — it didn't serve a real
+purpose. What an agent is doing (thought bubble, journal, quest log)
+already communicates *what's happening*; tying that to *where it's
+standing* in a village added rendering and layout complexity without
+adding understanding. The village is now a single shared space; file
+and module context surfaces as text, not geography.
 
 **Mana is a hybrid, not a flat cost.** A small flat cost applies at the
 moment of summoning (so spawning is always a real decision, not free),
@@ -526,8 +697,8 @@ loop:
   outside the repo." These govern the *world*, not any one character,
   so they don't belong in the per-agent inventory screen (§5). Better
   as visible rune circles / ward-lines on the village itself — e.g. an
-  invisible fence at the repo boundary that physically stops an NPC
-  from walking outside it.
+  invisible fence at the village boundary that physically stops an NPC
+  from taking a blocked action, regardless of which agent it is.
 - **Auto Mode → a gatekeeper NPC instead of a popup.** Claude Code's
   safety classifier auto-approves "safe" tool calls and holds "risky"
   ones for approval. Rather than every permission request opening the
@@ -550,3 +721,90 @@ loop:
   tome that persists between summons — opening it shows what it already
   knows about this project, distinct from the per-session journal (§6),
   which resets each time.
+
+## 18. Tutorials & onboarding
+
+Given how much this doc has accumulated — a control scheme, several
+overlays, shops, a Chronicle, cheat codes — new users (including future
+you, six months from now) need a real way to learn it in-world rather
+than a wiki page nobody opens.
+
+- **A guide NPC in the starting area** who walks you through the
+  basics on first launch: movement, talking to an agent, the summon
+  menu, the Mirror. Skippable, not forced, but present by default for a
+  first run.
+- **Contextual signposts, not just an intro.** Small in-world hint
+  prompts the first time you're near something new — the first time a
+  permission request fires, a one-line prompt about shield/palm; the
+  first time a subagent returns, a one-line note about the grader gate.
+  Teaches features at the moment they first matter, not all up front.
+- **A full reference, always available from the pause menu** — every
+  keybind, every action, every overlay, searchable — for whenever the
+  in-world hints aren't enough or you just want to look something up
+  directly, the same way a real settings/help screen would work.
+- **Re-playable, not one-time.** The guide NPC and signposts should be
+  revisitable on demand (not just first-launch), since new features
+  added over time (§17) will need their own onboarding moments without
+  requiring a full tutorial replay.
+
+## 19. Customization & extensibility
+
+The tool should support changing itself through the UI — someone should
+be able to conceptually reshape the world, add a new quest type, adjust
+a mechanic, without needing to leave the app or touch a config file
+directly.
+
+- **An in-app editor surface**, reachable from the pause menu, that
+  lets you describe or directly adjust world/feature behavior —
+  ranging from cosmetic (recolor the village, rename buildings) to
+  structural (add a new side-quest type, change what a hook's ward
+  looks like, adjust the mana formula).
+- **Changes should be scoped and reversible.** Whatever the editor
+  produces needs a clear "preview before apply" step and a one-click
+  revert, since letting someone reshape their own live tool is only
+  safe if undoing a bad change is just as easy as making it.
+- **This needs a real error boundary, not an afterthought.** Since
+  customization means arbitrary changes to a running app, a broken
+  edit has to fail gracefully rather than take down the whole session
+  — wrapping the customizable surfaces (not the core control loop) in
+  an error boundary that catches a crash without losing the underlying
+  agent sessions, which should keep running underneath regardless of
+  what the UI layer is doing.
+- **The crash message should stay in-world, not throw you into a stack
+  trace.** Something like the village briefly glitching or "a rift has
+  torn open" with a clear "revert to before this change" action — in
+  keeping with the game framing everywhere else in this doc, but still
+  giving a real, actionable way out rather than just being cute about
+  an actual failure.
+- **Isolate the blast radius.** A bad customization to, say, the
+  Tavern's rendering shouldn't be able to take down the Mirror or the
+  control loop for an active agent — the error boundary should be
+  scoped tightly enough that customization risk stays contained to
+  whatever was actually changed.
+
+## 20. The Map (world navigation)
+
+Deliberately distinct from the Mirror (§4). The Mirror answers "what
+are my agents doing" — it's agent-focused. The Map answers "where do I
+go" — it's geography-focused, and becomes necessary once the world is
+more than one screen (§1a).
+
+- **Shows the named areas** (Village Square, Shopping District, Tavern,
+  Ruins, Watchtower, Frontier, Arena, Docks) and your current position
+  within them.
+- **Discovery, not everything visible up front.** Areas you haven't
+  physically walked to yet stay greyed out/unlabeled until first visit
+  — a small, classic exploration reward rather than the whole world
+  being handed to you on the first map open.
+- **Fast travel to any discovered area.** Once you've been somewhere,
+  the Map lets you warp straight back — keeping a bigger world from
+  meaning more tedious walking every time, while still preserving the
+  first-visit discovery moment.
+- **Live pins for real signals**, not just static geography: open quest
+  board items (§9a), active bounties (§9b), shops with new stock
+  (§5b), and NPC camp clusters (§12) all show as pins, so a bigger
+  world doesn't mean losing track of where your attention is actually
+  needed.
+- **Reachable the same way as the other overlays** — a persistent
+  on-screen button per the simplified interaction model (§7a), not a
+  memorized hotkey.

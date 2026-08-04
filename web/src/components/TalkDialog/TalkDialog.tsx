@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { agentsAtom, journalAtom, uiModeAtom } from "@/store/gameAtoms";
 
 const STATUS_LABEL: Record<AgentSnapshot["status"], string> = {
-  summoning: "stepping through the portal",
+  summoning: "answering the summons",
   idle: "awaiting orders",
   thinking: "thinking",
   tool_running: "swinging a tool",

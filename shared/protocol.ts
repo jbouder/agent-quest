@@ -58,7 +58,7 @@ export interface SideQuest {
   icon: string;
   title: string;
   detail: string;
-  /** Prefills the portal when the quest is accepted. */
+  /** Prefills the summon dialog when the quest is accepted. */
   suggestedTask: string;
 }
 
@@ -99,8 +99,6 @@ export interface AgentSnapshot {
   toolUses: Record<string, ToolUseStat>;
   /** §6 quest log, from the agent's todo list. */
   quests: Quest[];
-  /** §1/§12 — top-level directory the agent last touched (its district). */
-  district: string | null;
   permissionMode: PermissionMode;
   /** §14 plan mode: true while the plan is still a draft (unsigned quest). */
   planPending: boolean;
@@ -140,10 +138,8 @@ export type ServerEvent =
       type: "snapshot";
       agents: AgentSnapshot[];
       player: PlayerState;
-      /** Repo root the village maps (§1) — also prefills the portal's cwd. */
+      /** Repo root the server watches — prefills the summon dialog's cwd. */
       defaultCwd: string;
-      /** §1/§12 — top-level directories of the repo, one house each. */
-      districts: string[];
       /** §9a — what's posted on the quest board right now. */
       sideQuests: SideQuest[];
       /** §9d town crier — recent commits, read aloud in the tavern. */
@@ -156,7 +152,7 @@ export type ServerEvent =
   | { type: "sessions"; sessions: SessionSummary[] };
 
 export type ClientCommand =
-  // §8 portal summon; `resume` revives a saved session as the NPC (§8a)
+  // §8 summon (from the menu, anywhere); `resume` revives a saved session (§8a)
   | {
       type: "summon";
       task: string;

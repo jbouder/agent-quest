@@ -69,8 +69,8 @@ export default function QuestBoardDialog() {
           ))}
         </div>
         <p className="mt-2 text-[10px] text-muted">
-          Accepting a quest carries it to the portal — an agent still has to be
-          summoned (and paid for).
+          Accepting a quest carries it to the Scroll of Summoning — an agent
+          still has to be summoned (and paid for).
         </p>
       </div>
     </div>

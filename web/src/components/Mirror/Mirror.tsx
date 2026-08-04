@@ -73,8 +73,8 @@ export default function Mirror() {
         </div>
         {agents.length === 0 && (
           <p className="rounded border border-border bg-card p-6 text-center text-sm text-muted">
-            The mirror shows only your own reflection. Summon an agent at the
-            portal.
+            The mirror shows only your own reflection. Summon an agent with the
+            ✨ scroll (top right).
           </p>
         )}
         <div className="grid max-h-[70vh] grid-cols-3 gap-3 overflow-y-auto">

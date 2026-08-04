@@ -28,7 +28,7 @@ export default function SummonDialog() {
     if (cwd === "" && defaultCwd !== "") setCwd(defaultCwd);
   }, [cwd, defaultCwd]);
 
-  // §9a — a quest accepted at the board carries over to the portal.
+  // §9a — a quest accepted at the board carries over to the scroll.
   useEffect(() => {
     if (open && prefill) {
       setTask(prefill);
@@ -72,7 +72,7 @@ export default function SummonDialog() {
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70">
       <div className="w-[520px] rounded-lg border-2 border-primary bg-card p-4 shadow-xl">
-        <h2 className="mb-1 text-primary">⟡ The Portal hums…</h2>
+        <h2 className="mb-1 text-primary">✨ The Scroll of Summoning</h2>
         <div className="mb-3 flex gap-3 text-xs">
           <button
             type="button"

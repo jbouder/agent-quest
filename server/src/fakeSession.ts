@@ -24,7 +24,7 @@ export class FakeAgentSession {
 
   private model: string;
   private status: AgentStatus = "summoning";
-  private thought = "walking in from the portal…";
+  private thought = "answering the summons…";
   private contextTokens = 12_000;
   private contextLimit: number;
   private tokensSpent = 0;
@@ -92,7 +92,6 @@ export class FakeAgentSession {
       },
       toolUses: {},
       quests: this.quests,
-      district: this.district,
       permissionMode: this.permissionMode,
       planPending: false,
       tomePreview: null,
@@ -255,7 +254,7 @@ export class FakeAgentSession {
       }
     }
 
-    // wander districts and swing tools
+    // wander the codebase (journal text, §12) and swing tools
     const tool = this.pick(FAKE_TOOLS);
     const district = this.pick(this.world.districts) ?? null;
     if (district && this.step % 3 === 0 && district !== this.district) {

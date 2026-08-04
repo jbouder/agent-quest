@@ -47,7 +47,14 @@ function useBard() {
     setPlaying(true);
   };
 
-  useEffect(() => stop, []);
+  // unmount-only cleanup via refs — `stop` gets a new identity every render
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      void ctxRef.current?.close();
+    },
+    [],
+  );
   return { playing, toggle: () => (playing ? stop() : start()) };
 }
 

@@ -59,7 +59,6 @@ export class SessionManager {
       agents: this.agents(),
       player: this.player(),
       defaultCwd: this.world.repoRoot,
-      districts: this.world.districts,
       sideQuests: this.sideQuests,
       recentCommits: this.recentCommits,
       demoMode: this.demoMode,
@@ -155,7 +154,7 @@ export class SessionManager {
     if (active >= MAX_CONCURRENT_AGENTS) {
       this.toast(
         "warn",
-        `The portal can sustain only ${MAX_CONCURRENT_AGENTS} agents at once.`,
+        `The village can sustain only ${MAX_CONCURRENT_AGENTS} agents at once.`,
       );
       return;
     }
@@ -185,7 +184,7 @@ export class SessionManager {
       "info",
       command.resume
         ? `${session.label} returns, carrying an old tome of memories.`
-        : `${session.label} steps through the portal.`,
+        : `${session.label} answers the summons.`,
     );
     this.scheduleBroadcast();
   }

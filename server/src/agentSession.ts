@@ -40,9 +40,10 @@ export interface SpawnSpec {
   resume?: string;
 }
 
-/** World context shared by all sessions: the repo the village maps (§1). */
+/** World context shared by all sessions: the repo the server watches. */
 export interface WorldContext {
   repoRoot: string;
+  /** Top-level directories — used only for journal text and quest scans. */
   districts: string[];
 }
 
@@ -170,7 +171,9 @@ export class QuestTracker {
       const quests = parseQuests(input);
       if (!quests) return false;
       this.byId.clear();
-      quests.forEach((quest, i) => this.byId.set(String(i + 1), quest));
+      quests.forEach((quest, i) => {
+        this.byId.set(String(i + 1), quest);
+      });
       this.nextId = quests.length + 1;
       return true;
     }
@@ -215,7 +218,7 @@ export class AgentSession {
 
   private model: string;
   private status: AgentStatus = "summoning";
-  private thought = "walking in from the portal…";
+  private thought = "answering the summons…";
   private contextTokens = 0;
   private contextLimit: number;
   private tokensSpent = 0;
@@ -299,7 +302,6 @@ export class AgentSession {
       inventory: this.inventory,
       toolUses: this.toolUses,
       quests: this.quests,
-      district: this.district,
       permissionMode: this.permissionMode,
       planPending: this.planPending,
       tomePreview: this.tomePreview,
@@ -598,7 +600,8 @@ export class AgentSession {
               this.planPending = false;
               this.events.onJournal("status", "quest accepted — plan signed");
             }
-            // §1: touching a file moves the NPC into that district.
+            // §12: module context surfaces as text (a journal line), not
+            // geography — the repo-as-village mapping was dropped.
             const touched = ["file_path", "path", "notebook_path"]
               .map((key) => input[key])
               .find((value): value is string => typeof value === "string");

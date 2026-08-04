@@ -12,21 +12,24 @@ implementation phases are built).
 
 ## How it works
 
-Every NPC in the village is a **real Claude Code session**. Summon one at
-the portal, hand it a quest, and it walks into town and gets to work:
+Every NPC in the village is a **real Claude Code session**. Open the
+✨ Scroll of Summoning from anywhere, hand it a quest, and an agent
+walks into town and gets to work:
 
 - 🧠 **Context window = health bar.** Auto-compaction restores it.
 - ❤️ **Your hearts = the shared budget.** At zero, everyone falls asleep.
-- 🏠 **One house per top-level directory.** Agents visibly walk to the
-  district they're editing.
 - ⚔️ **Subagents are minions.** Parallel fan-outs get a party badge;
   background tasks burn as campfires.
 - 📜 **Quests come from your repo.** The quest board scans stale
   branches, TODO/FIXME bounties, and README gaps.
+- 🖱 **Click/tap anything** — an agent, the quest board, the tavern —
+  or walk up and press Space/Enter.
 
-| The village | Summoning at the portal |
+| Summoning | Talking to an agent |
 | --- | --- |
-| ![District houses](docs/screenshots/districts.jpg) | ![The summon dialog](docs/screenshots/summon.jpg) |
+| ![The summon dialog](docs/screenshots/summon.jpg) | ![The talk dialog](docs/screenshots/talk.jpg) |
+| **The Mirror** | **The Chronicle** |
+| ![The Mirror](docs/screenshots/mirror.jpg) | ![The Chronicle](docs/screenshots/chronicle.jpg) |
 
 ## Quick start
 
@@ -36,7 +39,8 @@ cp .env.example .env   # optional — all settings have defaults
 npm run dev            # control server on :8787, game on :5173
 ```
 
-Open http://localhost:5173, walk south to the glowing portal, press `E`.
+Open http://localhost:5173 and follow the guide's tour — or hit ✨ in
+the top-right and summon your first agent.
 
 Want to explore without spending a cent? Run the whole game on scripted
 fake agents:
@@ -47,12 +51,16 @@ AGENT_QUEST_DEMO=1 npm run dev
 
 ### Controls
 
+Click or tap anything to interact with it — no keys required. The
+persistent icon row (top right) opens the global overlays: ✨ Summon,
+🪞 Mirror, 📜 Chronicle, ❓ Help. Optional keyboard accelerators:
+
 | Key | Action |
 | --- | --- |
 | `WASD` / arrows | Move |
-| `E` | Interact — talk, summon, read, poke ducks |
+| `Space` / `Enter` | Interact with whatever's in range (`E` also works) |
 | `M` | The Mirror: live agent grid, tap to warp |
-| `J` | Journal drawer (quest log) |
+| `J` | The Chronicle: every agent's journal, one filterable feed |
 | `` ` `` | Cheat console: noclip, speed, warp, reveal, god mode |
 
 Configuration lives in a single `.env` at the repo root (see
@@ -63,7 +71,7 @@ Claude Code credentials).
 ## Features
 
 **Phase 1 — core loop**
-- Village + movement, portal summon with model-as-equipment and
+- Village + movement, summon-from-anywhere with model-as-equipment and
   permission gate choice (§1, §8)
 - Real agents as NPCs via the Claude Agent SDK: status animations,
   NPC health = context window, player hearts = shared budget (§2, §3)
@@ -73,22 +81,30 @@ Claude Code credentials).
 - The Mirror (`M`): live agent grid, attention pulse, tap to warp (§4)
 - Inventory: tools/skills/MCP items with used-this-session glow; model
   as an equipment slot with real mid-session re-equip (§5, §5a)
-- Quest log from TaskCreate/TaskUpdate; journal drawer (`J`) (§6);
+- Quest log from TaskCreate/TaskUpdate; the Chronicle (`J`) — every
+  agent's journal in one filterable feed (§6, §6a);
   camp clustering past 6 NPCs with Mirror promotion (§12)
 
 **Phase 3 — a living world**
-- Repo-as-village districts; agents walk to where they're working (§1, §12)
-- Quest board scanned from the repo; accepting prefills the portal (§9a, §9b)
+- Quest board scanned from the repo; accepting prefills the summon
+  scroll (§9a, §9b)
 - Subagent minions, party badges, scroll-flash returns, campfires (§13, §14)
 - Plan mode = draft quest log; CLAUDE.md as a memory tome; Auto Mode
   gatekeeper NPC (§14)
 
 **Phase 4 — depth & delight**
-- Revive saved sessions from the portal (§8a)
+- Revive saved sessions from the summon dialog (§8a)
 - The Tavern: procedural bard, town crier reading recent commits,
   library keyed to live activity, a garden (§9d)
 - The Scrying Pool: summons a real Haiku scout to web-search (§9e)
 - Easter eggs (§15) and the cheat console — god mode is real Auto Mode (§16)
+
+**Enhancements A & B — interaction + onboarding**
+- Simplified interaction model: click/tap anything directly, one
+  consistent interact key (Space/Enter), persistent on-screen buttons
+  for all global overlays (§7a)
+- Guide NPC by the fountain with a replayable tour, first-time
+  contextual hints, and a searchable in-game reference (§18)
 
 **Known gaps (honest ones):** hooks-as-wards and the trophy rewind
 mechanic have no reliable SDK signal yet; live attach to a session

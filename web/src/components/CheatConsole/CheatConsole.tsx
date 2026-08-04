@@ -51,7 +51,7 @@ export default function CheatConsole() {
         else
           localToast(
             "warn",
-            "warp where? (a district name, portal, tavern, pool, board, camp, mirror)",
+            "warp where? (an agent name, plaza, entrance, tavern, pool, board, camp, pond, mirror)",
           );
         break;
       case "reveal":
