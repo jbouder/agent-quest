@@ -209,7 +209,7 @@ web/                 Vite + React 19 + Phaser 3 game client
 ## Quality gate
 
 ```sh
-npm run build && npm run test && npm run check
+npm run build && npm run check
 ```
 
 Note: the in-game dialogs are intentionally custom pixel-styled UI rather

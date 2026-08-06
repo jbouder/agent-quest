@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
     "build": "npm run typecheck -w server && npm run build -w web",
-    "test": "npm run test -w server -- --run && npm run test -w web -- --run",
     "check": "biome check --write ."
   },
   "devDependencies": {

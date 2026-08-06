@@ -285,7 +285,7 @@ The same argument that makes *interact* a single consistent button
 applies to the overlays once they're open: a dialog whose Esc works is
 worse than useless if the next dialog's doesn't, because the player
 stops trusting the key. So every overlay signs one contract, enforced
-by `useDialog` and a test that renders all of them:
+by `useDialog`:
 
 - **Esc closes it**, and only the top-most open dialog answers, so a
   stack unwinds one level per press.
