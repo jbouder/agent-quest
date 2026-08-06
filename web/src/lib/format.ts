@@ -13,14 +13,19 @@ export function formatTokens(value: number): string {
 export const HEART_COUNT = 10;
 
 /**
- * Player hearts (§2): budget remaining, quantized into HEART_COUNT hearts.
- * Returns one fill fraction (0..1) per heart, left to right.
+ * Player hearts (§2): budget remaining, quantized into hearts. The count is
+ * §19-customizable — more hearts, finer mana granularity. Returns one fill
+ * fraction (0..1) per heart, left to right.
  */
-export function heartsFor(spentUsd: number, budgetUsd: number): number[] {
+export function heartsFor(
+  spentUsd: number,
+  budgetUsd: number,
+  count = HEART_COUNT,
+): number[] {
   const remaining =
     budgetUsd <= 0 ? 0 : Math.min(1, Math.max(0, 1 - spentUsd / budgetUsd));
-  return Array.from({ length: HEART_COUNT }, (_, i) => {
-    const fill = remaining * HEART_COUNT - i;
+  return Array.from({ length: count }, (_, i) => {
+    const fill = remaining * count - i;
     return Math.min(1, Math.max(0, fill));
   });
 }

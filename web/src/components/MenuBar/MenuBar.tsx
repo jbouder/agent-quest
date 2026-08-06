@@ -51,6 +51,13 @@ export default function MenuBar() {
       onClick: () => setChronicleOpen(!chronicleOpen),
     },
     {
+      icon: "✎",
+      label: "World Codex", // §19 — reshape the world; preview, apply, revert
+      active: ui.mode === "editor",
+      onClick: () =>
+        setUi(ui.mode === "editor" ? { mode: "roam" } : { mode: "editor" }),
+    },
+    {
       icon: "❓",
       label: "Help",
       active: ui.mode === "help",

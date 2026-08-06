@@ -85,55 +85,70 @@ export default function Mirror() {
             );
             const departed = agent.status === "ended";
             return (
-              <button
+              <div
                 key={agent.id}
-                type="button"
-                onClick={() => warpTo(agent)}
-                disabled={departed}
                 className={cn(
-                  "rounded-lg border-2 bg-card p-3 text-left",
+                  "relative rounded-lg border-2 bg-card p-3 text-left",
                   needsAttention(agent)
                     ? "animate-pulse border-primary"
                     : "border-border",
                   departed
                     ? "opacity-40"
-                    : "hover:border-accent focus:border-accent",
+                    : "hover:border-accent focus-within:border-accent",
                 )}
               >
-                <div className="mb-1 flex items-baseline justify-between">
-                  <span className="text-sm">{agent.label}</span>
-                  <span
-                    className={cn(
-                      "text-[10px]",
-                      TIER_CLASS[tierOf(agent.model)],
-                    )}
-                  >
-                    {agent.model.replace("claude-", "")}
-                  </span>
-                </div>
-                <p className="mb-1 text-xs text-muted">
-                  {STATUS_TEXT[agent.status]}
-                </p>
-                <div className="mb-1 h-1.5 rounded bg-background">
-                  <div
-                    className={cn(
-                      "h-1.5 rounded",
-                      health > 0.5
-                        ? "bg-accent"
-                        : health > 0.25
-                          ? "bg-primary"
-                          : "bg-destructive",
-                    )}
-                    style={{ width: `${health * 100}%` }}
-                  />
-                </div>
-                <p className="truncate text-[10px] text-muted">
-                  {agent.thought || agent.task}
-                </p>
-                <p className="mt-1 text-[10px] text-muted">
-                  {formatUsd(agent.costUsd)} spent
-                </p>
-              </button>
+                {/* §5/§7a — every agent's inventory, two clicks from anywhere */}
+                <button
+                  type="button"
+                  title={`${agent.label}'s inventory`}
+                  onClick={() =>
+                    setUi({ mode: "inventory", agentId: agent.id })
+                  }
+                  className="absolute right-2 bottom-2 text-sm opacity-60 hover:opacity-100"
+                >
+                  🎒
+                </button>
+                <button
+                  type="button"
+                  onClick={() => warpTo(agent)}
+                  disabled={departed}
+                  className="block w-full text-left"
+                >
+                  <div className="mb-1 flex items-baseline justify-between">
+                    <span className="text-sm">{agent.label}</span>
+                    <span
+                      className={cn(
+                        "text-[10px]",
+                        TIER_CLASS[tierOf(agent.model)],
+                      )}
+                    >
+                      {agent.model.replace("claude-", "")}
+                    </span>
+                  </div>
+                  <p className="mb-1 text-xs text-muted">
+                    {STATUS_TEXT[agent.status]}
+                  </p>
+                  <div className="mb-1 h-1.5 rounded bg-background">
+                    <div
+                      className={cn(
+                        "h-1.5 rounded",
+                        health > 0.5
+                          ? "bg-accent"
+                          : health > 0.25
+                            ? "bg-primary"
+                            : "bg-destructive",
+                      )}
+                      style={{ width: `${health * 100}%` }}
+                    />
+                  </div>
+                  <p className="truncate text-[10px] text-muted">
+                    {agent.thought || agent.task}
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted">
+                    {formatUsd(agent.costUsd)} spent
+                  </p>
+                </button>
+              </div>
             );
           })}
         </div>

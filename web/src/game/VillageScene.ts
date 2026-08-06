@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { contextHealth, describeWard } from "@/lib/format";
+import { hexToNumber, type WorldOverrides } from "@/lib/overrides";
 import type {
   AgentSnapshot,
   AgentStatus,
@@ -19,6 +20,7 @@ import {
   mapTravelAtom,
   nearbyAtom,
   noclipAtom,
+  overridesAtom,
   playerAreaAtom,
   playerPosAtom,
   revealMapAtom,
@@ -43,7 +45,7 @@ import {
   WORLD_H,
   WORLD_W,
 } from "./areas";
-import { generateTextures, modelTier } from "./textures";
+import { generateTextures, modelTier, shade } from "./textures";
 import {
   freeTrophySpot,
   MAX_SUBAGENT_MARKS,
@@ -564,13 +566,24 @@ export class VillageScene extends Phaser.Scene {
   // §20 — discovery + the Map's you-are-here dot
   private lastArea: string | null = null;
   private lastPosWrite = 0;
+  /** §19 — the overrides this world was built from (fresh scene per change). */
+  private overrides!: WorldOverrides;
 
   constructor() {
     super("village");
   }
 
   create(): void {
-    generateTextures(this);
+    // §19 — the world renders from the overrides document; the GameCanvas
+    // rebuilds the whole game when it changes, so one read here suffices.
+    this.overrides = gameStore.get(overridesAtom);
+    generateTextures(this, {
+      grass: hexToNumber(this.overrides.palette.grass),
+      path: hexToNumber(this.overrides.palette.path),
+      playerTunic: hexToNumber(this.overrides.player.tunic),
+      wardWatch: hexToNumber(this.overrides.wards.watch),
+      wardGuard: hexToNumber(this.overrides.wards.guard),
+    });
     this.buildWorld();
 
     this.playerShadow = this.add
@@ -737,7 +750,7 @@ export class VillageScene extends Phaser.Scene {
     // runs past the old entrance, through the road cell, to the world's edge
     const roadEnd = WORLD_H - 60;
     const rim = this.add.graphics().setDepth(1);
-    rim.fillStyle(0x7d5f33);
+    rim.fillStyle(shade(hexToNumber(this.overrides.palette.path), 0.6));
     rim.fillRect(PLAZA.x - 38, PLAZA.y - 6, 76, roadEnd - PLAZA.y + 12);
     rim.fillRect(PLAZA.x - 150, PLAZA.y - 118, 300, 236);
     this.add
@@ -766,11 +779,11 @@ export class VillageScene extends Phaser.Scene {
     this.clickable(this.add.image(TAVERN.x, TAVERN.y, "tavern").setDepth(3), {
       kind: "tavern",
     });
-    this.addLabel(TAVERN.x, TAVERN.y + 48, "tavern");
+    this.addLabel(TAVERN.x, TAVERN.y + 48, this.overrides.names.tavern);
     this.clickable(this.add.image(TOWER.x, TOWER.y, "tower").setDepth(3), {
       kind: "scry",
     });
-    this.addLabel(TOWER.x, TOWER.y + 48, "scrying pool");
+    this.addLabel(TOWER.x, TOWER.y + 48, this.overrides.names.pool);
 
     // §18 — the guide, waiting by the fountain for anyone who wants the tour.
     this.addShadow(GUIDE.x, GUIDE.y + 1, 0.55);
@@ -778,7 +791,7 @@ export class VillageScene extends Phaser.Scene {
       this.add.image(GUIDE.x, GUIDE.y, "guide").setOrigin(0.5, 1).setDepth(9),
       { kind: "guide" },
     );
-    this.addLabel(GUIDE.x, GUIDE.y + 10, "guide");
+    this.addLabel(GUIDE.x, GUIDE.y + 10, this.overrides.names.guide);
     const guideMark = this.add
       .text(GUIDE.x, GUIDE.y - 38, "?", {
         fontFamily: "monospace",
@@ -957,7 +970,11 @@ export class VillageScene extends Phaser.Scene {
       if (area.id === "square") continue;
       const landing = LANDINGS[area.id];
       this.add.image(landing.x, landing.y - 8, "signpost").setDepth(4);
-      this.addLabel(landing.x, landing.y + 14, area.name.toLowerCase());
+      this.addLabel(
+        landing.x,
+        landing.y + 14,
+        (this.overrides.names.areas[area.id] ?? area.name).toLowerCase(),
+      );
     }
   }
 
@@ -1163,7 +1180,9 @@ export class VillageScene extends Phaser.Scene {
       this.wardCircles.set(ward.id, this.addRuneCircle(ward, spot));
     });
 
-    const guarded = wards.some((ward) => ward.blocking);
+    // §19 — the fence is a customizable look; the hooks stay real either way.
+    const guarded =
+      this.overrides.wards.fence && wards.some((ward) => ward.blocking);
     if (guarded && !this.wardFence) this.wardFence = this.buildWardFence();
     if (!guarded && this.wardFence) {
       this.wardFence.destroy(true);
@@ -1595,7 +1614,8 @@ export class VillageScene extends Phaser.Scene {
         gameStore.set(discoveredAreasAtom, next);
         saveDiscovered(next);
         const area = areaById(areaNow);
-        localToast("info", `✦ Discovered: ${area.name} — ${area.blurb}`);
+        const name = this.overrides.names.areas[areaNow] ?? area.name;
+        localToast("info", `✦ Discovered: ${name} — ${area.blurb}`);
         hintOnce(
           "map-discovery",
           "🗺 Discovered places appear on your Map — open it to fast travel back.",
@@ -1618,9 +1638,9 @@ export class VillageScene extends Phaser.Scene {
       if (this.cursors.up.isDown || this.wasd.W.isDown) vy -= 1;
       if (this.cursors.down.isDown || this.wasd.S.isDown) vy += 1;
     }
-    const speed = gameStore.get(speedBoostAtom)
-      ? PLAYER_SPEED * 2
-      : PLAYER_SPEED;
+    // §19 — base pace is customizable; the §16 speed cheat stacks on top.
+    const base = PLAYER_SPEED * this.overrides.player.speed;
+    const speed = gameStore.get(speedBoostAtom) ? base * 2 : base;
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
     if (vx !== 0) this.player.setFlipX(vx < 0);

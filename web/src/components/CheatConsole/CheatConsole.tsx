@@ -6,11 +6,12 @@ import {
   debugOverlayAtom,
   noclipAtom,
   revealMapAtom,
+  riftTestAtom,
   speedBoostAtom,
   uiModeAtom,
 } from "@/store/gameAtoms";
 
-const HELP = `noclip · speed · warp <place> · reveal · debug · godmode on|off · help`;
+const HELP = `noclip · speed · warp <place> · reveal · debug · godmode on|off · rift <world|hud|board|map> · help`;
 
 /** §16 — backtick console. God mode is real Auto Mode, not disabled safety. */
 export default function CheatConsole() {
@@ -20,6 +21,7 @@ export default function CheatConsole() {
   const [debug, setDebug] = useAtom(debugOverlayAtom);
   const setReveal = useSetAtom(revealMapAtom);
   const setWarp = useSetAtom(cheatWarpAtom);
+  const setRift = useSetAtom(riftTestAtom);
   const [text, setText] = useState("");
   const open = ui.mode === "cheat";
 
@@ -64,6 +66,16 @@ export default function CheatConsole() {
       case "godmode":
         // The gates stay — they're handed to the classifier (real Auto Mode).
         sendCommand({ type: "autoMode", enabled: arg !== "off" });
+        break;
+      case "rift":
+        // §19 — tear a surface on purpose, to prove the boundary holds:
+        // that surface crashes, everything else (and every agent) survives.
+        if (["world", "hud", "board", "map"].includes(arg)) {
+          setRift(arg);
+          localToast("warn", `⚡ a rift tears open over the ${arg}…`);
+        } else {
+          localToast("warn", "rift where? (world, hud, board, map)");
+        }
         break;
       case "help":
         localToast("info", HELP);

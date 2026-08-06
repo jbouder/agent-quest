@@ -1,6 +1,8 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
+import type { SideQuest } from "@/lib/protocol";
 import {
+  overridesAtom,
   sideQuestsAtom,
   summonPrefillAtom,
   uiModeAtom,
@@ -9,9 +11,22 @@ import {
 /** §9a — the board in the village square where side quests post themselves. */
 export default function QuestBoardDialog() {
   const [ui, setUi] = useAtom(uiModeAtom);
-  const quests = useAtomValue(sideQuestsAtom);
+  const scanned = useAtomValue(sideQuestsAtom);
+  const overrides = useAtomValue(overridesAtom);
   const setPrefill = useSetAtom(summonPrefillAtom);
   const open = ui.mode === "board";
+
+  // §19 — your own notices (a custom side-quest type) post above the
+  // repo-scanned ones. They're yours, so they never get crowded out.
+  const custom: SideQuest[] = overrides.customQuests.map((quest, index) => ({
+    id: `custom:${index}`,
+    kind: "custom",
+    icon: quest.icon,
+    title: quest.title,
+    detail: quest.detail || "posted by you, via the World Codex",
+    suggestedTask: quest.task,
+  }));
+  const quests = [...custom, ...scanned];
 
   useEffect(() => {
     if (!open) return;

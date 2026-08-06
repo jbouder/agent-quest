@@ -1,5 +1,10 @@
 import { atom, createStore } from "jotai";
 import { type AreaId, loadDiscovered } from "@/game/areas";
+import {
+  DEFAULT_OVERRIDES,
+  loadOverrides,
+  type WorldOverrides,
+} from "@/lib/overrides";
 import type {
   AgentSnapshot,
   JournalLine,
@@ -45,6 +50,20 @@ export const wardsAtom = atom<Ward[]>([]);
 
 /** §9b — the party's shared boss fight, when one has formed. */
 export const raidAtom = atom<Raid | null>(null);
+
+/**
+ * §19 — the live overrides document the customizable surfaces render from.
+ * The editor previews by setting this without persisting; Apply persists and
+ * pushes history; revert (editor or rift) pops it.
+ */
+export const overridesAtom = atom<WorldOverrides>(
+  typeof localStorage !== "undefined"
+    ? loadOverrides().current
+    : DEFAULT_OVERRIDES,
+);
+
+/** §19/§16 — a rift summoned on purpose: which surface should crash. */
+export const riftTestAtom = atom<string | null>(null);
 
 /** §5b — the Shopping District's shelves, restocked by the server. */
 export const shopsAtom = atom<Record<ShopKind, ShopStock>>({
@@ -147,6 +166,8 @@ export type UiMode =
   | { mode: "map" }
   // §5b — one of the Shopping District's three specialty shops
   | { mode: "shop"; shop: ShopKind }
+  // §19 — the World Codex: reshape the world, preview, apply, revert
+  | { mode: "editor" }
   | { mode: "cheat" }
   // §18 — the guide's walkthrough and the searchable full reference
   | { mode: "tutorial" }

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   connectedAtom,
   demoModeAtom,
+  overridesAtom,
   playerAtom,
   shieldAtom,
 } from "@/store/gameAtoms";
@@ -28,7 +29,13 @@ export default function Hud() {
   const connected = useAtomValue(connectedAtom);
   const demoMode = useAtomValue(demoModeAtom);
   const shield = useAtomValue(shieldAtom);
-  const hearts = heartsFor(player.spentUsd, player.budgetUsd);
+  const overrides = useAtomValue(overridesAtom);
+  // §19 — heart count is customizable: the mana formula's visible half.
+  const hearts = heartsFor(
+    player.spentUsd,
+    player.budgetUsd,
+    overrides.hearts.count,
+  );
 
   return (
     <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1">

@@ -77,7 +77,8 @@ export interface SideQuest {
     | "ruins" // overgrown tech debt: code nobody has touched in months
     | "merchant" // a traveling merchant with dependency updates
     | "trickster" // flaky or quarantined tests
-    | "escort"; // a new contributor who needs guiding through the village
+    | "escort" // a new contributor who needs guiding through the village
+    | "custom"; // §19 — posted by the player through the World Codex
   icon: string;
   title: string;
   detail: string;

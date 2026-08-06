@@ -18,13 +18,43 @@ export const TIER_COLORS: Record<ModelTier, number> = {
 };
 
 // A Link to the Past-ish palette: saturated ground colors, dark outlines,
-// every material shaded in 2-3 tones.
+// every material shaded in 2-3 tones. Ground colors are §19-customizable;
+// the light/dark tones derive from whatever base the overrides provide.
 const OUTLINE = 0x1d2418;
-const GRASS = { base: 0x4a9648, light: 0x5cab57, dark: 0x3b7c3c };
-const PATH = { base: 0xcfa961, light: 0xdfc07e, dark: 0xb8924f };
 const WOOD = { light: 0x9a6a40, base: 0x7a5230, dark: 0x54381f };
 const STONE = { light: 0x9aa3b8, base: 0x707a92, dark: 0x4a5266 };
 const WATER = { deep: 0x2456a8, base: 0x3a74cc, light: 0x7fb2ec };
+
+/** Mix a 0xRRGGBB color toward white. */
+function lighten(color: number, factor: number): number {
+  const channel = (shift: number) => {
+    const value = (color >> shift) & 0xff;
+    return Math.min(255, Math.round(value + (255 - value) * factor));
+  };
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
+/** The three tones every ground material renders in, from one base. */
+function tones(base: number): { base: number; light: number; dark: number } {
+  return { base, light: lighten(base, 0.16), dark: shade(base, 0.8) };
+}
+
+/** §19 — the knobs generateTextures accepts from the overrides document. */
+export interface TexturePalette {
+  grass: number;
+  path: number;
+  playerTunic: number;
+  wardWatch: number;
+  wardGuard: number;
+}
+
+export const DEFAULT_TEXTURE_PALETTE: TexturePalette = {
+  grass: 0x4a9648,
+  path: 0xcfa961,
+  playerTunic: 0x2e7d32,
+  wardWatch: 0x6fb6d6,
+  wardGuard: 0xd4a017,
+};
 
 function character(
   scene: Phaser.Scene,
@@ -71,7 +101,7 @@ function character(
 }
 
 /** Multiply a 0xRRGGBB color toward black. */
-function shade(color: number, factor: number): number {
+export function shade(color: number, factor: number): number {
   const r = Math.floor(((color >> 16) & 0xff) * factor);
   const gr = Math.floor(((color >> 8) & 0xff) * factor);
   const b = Math.floor((color & 0xff) * factor);
@@ -99,7 +129,12 @@ function groundTile(
   g.clear();
 }
 
-export function generateTextures(scene: Phaser.Scene): void {
+export function generateTextures(
+  scene: Phaser.Scene,
+  palette: TexturePalette = DEFAULT_TEXTURE_PALETTE,
+): void {
+  const GRASS = tones(palette.grass);
+  const PATH = tones(palette.path);
   const g = scene.add.graphics();
 
   // three grass variants so the ground never tiles visibly
@@ -548,8 +583,8 @@ export function generateTextures(scene: Phaser.Scene): void {
   // §14 wards — a hook is a rune circle etched into the ground. Watching
   // wards glow cool blue; blocking wards burn amber, the color of a gate.
   for (const [key, color] of [
-    ["rune-watch", 0x6fb6d6],
-    ["rune-guard", 0xd4a017],
+    ["rune-watch", palette.wardWatch],
+    ["rune-guard", palette.wardGuard],
   ] as const) {
     g2.lineStyle(2, color, 0.9);
     g2.strokeEllipse(26, 16, 46, 26);
@@ -581,7 +616,7 @@ export function generateTextures(scene: Phaser.Scene): void {
   g2.destroy();
 
   // player + one NPC skin per model tier, plus villagers
-  character(scene, "player", 0x2e7d32, 0x6b4a2f);
+  character(scene, "player", palette.playerTunic, 0x6b4a2f);
   character(scene, "oldman", 0x8a8a9a, 0xe8e3d0);
   character(scene, "gatekeeper", 0x8f2f2f, 0x2c2c34);
   character(scene, "guide", 0x2d8a80, 0xe8e3d0); // §18 tutorial guide

@@ -18,6 +18,7 @@ import {
   discoveredAreasAtom,
   longWaitAtom,
   mapTravelAtom,
+  overridesAtom,
   playerAreaAtom,
   playerPosAtom,
   raidAtom,
@@ -120,7 +121,11 @@ export default function MapDialog() {
   const raid = useAtomValue(raidAtom);
   const longWait = useAtomValue(longWaitAtom);
   const shops = useAtomValue(shopsAtom);
+  const overrides = useAtomValue(overridesAtom);
   const open = ui.mode === "map";
+  // §19 — renamed areas show their given names everywhere, the Map included.
+  const nameOf = (id: AreaId, fallback: string) =>
+    overrides.names.areas[id] ?? fallback;
 
   useEffect(() => {
     if (!open) return;
@@ -180,7 +185,7 @@ export default function MapDialog() {
                   onClick={() => travel(area.id)}
                   title={
                     known
-                      ? `Fast travel to ${area.name}`
+                      ? `Fast travel to ${nameOf(area.id, area.name)}`
                       : "Undiscovered — walk there first"
                   }
                   className={cn(
@@ -195,7 +200,7 @@ export default function MapDialog() {
                     <>
                       <div>
                         <p className="text-xs text-foreground">
-                          {area.name}
+                          {nameOf(area.id, area.name)}
                           {here && (
                             <span className="ml-1 text-primary">◈ you</span>
                           )}

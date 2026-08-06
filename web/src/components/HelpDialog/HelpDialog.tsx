@@ -77,7 +77,7 @@ const ENTRIES: Entry[] = [
     section: "Agent actions",
     name: "Inventory & equipment",
     detail:
-      "From the talk dialog: skills, plugins, MCP servers, and the model as an equipment slot — swap it mid-task for a visible re-equip.",
+      "From the talk dialog, or the 🎒 on any Mirror card (so it's reachable from anywhere): skills, plugins, MCP servers, and the model as an equipment slot — swap it mid-task for a visible re-equip.",
   },
   {
     section: "Places",
@@ -114,6 +114,18 @@ const ENTRIES: Entry[] = [
     name: "The Docks",
     detail:
       "Southwest. The dock lights up while a long background task runs — an idle line to cast that ends when the work does.",
+  },
+  {
+    section: "Customization",
+    name: "The World Codex",
+    detail:
+      "The ✎ button. Reshape the world: recolor the ground, retint your tunic, adjust pace and heart count, restyle wards, rename places, and post your own board notices. Preview renders without keeping; Apply remembers the old shape; Revert is one click.",
+  },
+  {
+    section: "Customization",
+    name: "Rifts",
+    detail:
+      "If a change breaks a surface, a rift tears open over that surface only — agents keep running underneath. Seal it to revert the last change, or patch it to just reload the surface. (Try it: ` then 'rift world'.)",
   },
   {
     section: "Places",
