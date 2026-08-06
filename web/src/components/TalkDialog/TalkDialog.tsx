@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { contextHealth, formatTokens, formatUsd } from "@/lib/format";
 import type { AgentSnapshot } from "@/lib/protocol";
 import { sendCommand } from "@/lib/socket";
@@ -24,6 +25,12 @@ export default function TalkDialog() {
   const journal = useAtomValue(journalAtom);
   const [text, setText] = useState("");
 
+  const dialog = useDialog({
+    open: ui.mode === "talk",
+    onClose: () => setUi({ mode: "roam" }),
+    label: "Talk to agent",
+  });
+
   if (ui.mode !== "talk") return null;
   const agent = agents.find((a) => a.id === ui.agentId);
   if (!agent) return null;
@@ -41,7 +48,10 @@ export default function TalkDialog() {
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
-      <div className="w-[640px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4 shadow-xl">
+      <div
+        {...dialog}
+        className="w-[640px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4 shadow-xl"
+      >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-accent">
             {agent.label}{" "}
@@ -193,7 +203,6 @@ export default function TalkDialog() {
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") steer();
-                if (e.key === "Escape") close();
               }}
               placeholder={
                 agent.status === "sleeping"

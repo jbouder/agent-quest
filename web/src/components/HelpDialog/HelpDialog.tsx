@@ -1,5 +1,6 @@
 import { useAtom } from "jotai";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { uiModeAtom } from "@/store/gameAtoms";
 
 interface Entry {
@@ -20,6 +21,12 @@ const ENTRIES: Entry[] = [
     name: "Interact",
     detail:
       "Click/tap anything directly, or walk up and press Space or Enter when the prompt appears. (E also works.)",
+  },
+  {
+    section: "Getting around",
+    name: "Dialogs & the keyboard",
+    detail:
+      "Every dialog behaves the same: Tab and Shift+Tab move between its controls (never out of it), Enter or Space presses the focused one, and Esc closes it. Esc with nothing open hands the keyboard back to the world.",
   },
   {
     section: "Overlays",
@@ -163,15 +170,11 @@ export default function HelpDialog() {
   const [ui, setUi] = useAtom(uiModeAtom);
   const [search, setSearch] = useState("");
   const open = ui.mode === "help";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "Reference",
+  });
 
   if (!open) return null;
 
@@ -188,7 +191,10 @@ export default function HelpDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="flex max-h-[85vh] w-[560px] max-w-[95vw] flex-col rounded-lg border-2 border-accent bg-card p-4 shadow-xl">
+      <div
+        {...dialog}
+        className="flex max-h-[85vh] w-[560px] max-w-[95vw] flex-col rounded-lg border-2 border-accent bg-card p-4 shadow-xl"
+      >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-accent">❓ Reference</h2>
           <button

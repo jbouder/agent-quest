@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { domControlFocused } from "@/lib/focus";
 import { contextHealth, describeWard } from "@/lib/format";
 import { hexToNumber, type WorldOverrides } from "@/lib/overrides";
 import type {
@@ -1534,7 +1535,12 @@ export class VillageScene extends Phaser.Scene {
   }
 
   update(): void {
-    const roaming = gameStore.get(uiModeAtom).mode === "roam";
+    // The world only owns the keyboard when nothing in the DOM does. Phaser's
+    // global capture calls preventDefault() on Enter and Space, so without
+    // standing down here a Tab-focused button (the icon row, a dialog's
+    // controls) would never receive its activation click.
+    const roaming =
+      gameStore.get(uiModeAtom).mode === "roam" && !domControlFocused();
     const keyboard = this.input.keyboard;
     if (keyboard && roaming !== this.keysEnabled) {
       this.keysEnabled = roaming;

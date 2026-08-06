@@ -1,5 +1,6 @@
 import { useAtom } from "jotai";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { uiModeAtom } from "@/store/gameAtoms";
 
 export const TUTORIAL_DONE_KEY = "aq-tutorial-done";
@@ -37,6 +38,14 @@ export default function TutorialDialog() {
   const [step, setStep] = useState(0);
   const open = ui.mode === "tutorial";
 
+  // Escape is "skip the tour" — same as the button, tour marked done.
+  const closeRef = useRef<() => void>(() => {});
+  const dialog = useDialog({
+    open,
+    onClose: () => closeRef.current(),
+    label: "Tutorial",
+  });
+
   if (!open) return null;
 
   const close = () => {
@@ -44,12 +53,16 @@ export default function TutorialDialog() {
     setStep(0);
     setUi({ mode: "roam" });
   };
+  closeRef.current = close;
   const current = STEPS[step] ?? STEPS[0];
   const last = step === STEPS.length - 1;
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70">
-      <div className="w-[440px] max-w-[92vw] rounded-lg border-2 border-accent bg-card p-4 shadow-xl">
+      <div
+        {...dialog}
+        className="w-[440px] max-w-[92vw] rounded-lg border-2 border-accent bg-card p-4 shadow-xl"
+      >
         <div className="mb-1 flex items-baseline justify-between">
           <h2 className="text-accent">🧭 {current?.title}</h2>
           <span className="text-[10px] text-muted">
@@ -63,7 +76,7 @@ export default function TutorialDialog() {
             onClick={close}
             className="rounded border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground"
           >
-            Skip tour
+            Skip tour (Esc)
           </button>
           <div className="flex gap-2">
             {step > 0 && (

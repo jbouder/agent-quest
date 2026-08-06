@@ -1,6 +1,7 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useRef } from "react";
 import { createGame } from "@/game/createGame";
+import { releaseToWorld } from "@/lib/focus";
 import { overridesAtom } from "@/store/gameAtoms";
 
 export default function GameCanvas() {
@@ -18,5 +19,13 @@ export default function GameCanvas() {
     return () => game.destroy(true);
   }, [overrides]);
 
-  return <div ref={hostRef} className="absolute inset-0" />;
+  // Touching the world takes the keyboard back from whatever button was
+  // still holding it, so WASD never goes quietly dead after a dialog visit.
+  return (
+    <div
+      ref={hostRef}
+      onPointerDown={releaseToWorld}
+      className="absolute inset-0"
+    />
+  );
 }

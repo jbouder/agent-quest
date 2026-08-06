@@ -40,3 +40,17 @@ body,
 canvas {
   image-rendering: pixelated;
 }
+
+/* One focus ring for the whole village. Keyboard users always get a visible
+   ring; mouse users never see one. Dialog panels take focus programmatically
+   on open (tabindex="-1") — that's a scroll target, not a control, so it
+   stays unringed. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+[role="dialog"]:focus-visible {
+  outline: none;
+}

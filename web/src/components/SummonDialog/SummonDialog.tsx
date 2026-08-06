@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { MODELS } from "@/lib/models";
 import type { PermissionMode } from "@/lib/protocol";
 import { sendCommand } from "@/lib/socket";
@@ -23,6 +24,11 @@ export default function SummonDialog() {
   const [permissionMode, setPermissionMode] =
     useState<PermissionMode>("default");
   const open = ui.mode === "summon";
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "The Scroll of Summoning",
+  });
 
   useEffect(() => {
     if (cwd === "" && defaultCwd !== "") setCwd(defaultCwd);
@@ -84,7 +90,10 @@ export default function SummonDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70">
-      <div className="w-[520px] rounded-lg border-2 border-primary bg-card p-4 shadow-xl">
+      <div
+        {...dialog}
+        className="w-[520px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4 shadow-xl"
+      >
         <h2 className="mb-1 text-primary">✨ The Scroll of Summoning</h2>
         <div className="mb-3 flex gap-3 text-xs">
           <button
@@ -126,7 +135,6 @@ export default function SummonDialog() {
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") close();
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) summon();
                 }}
                 rows={3}

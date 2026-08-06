@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useEffect } from "react";
+import { useDialog } from "@/components/Dialog";
 import { contextHealth, formatUsd } from "@/lib/format";
 import type { AgentSnapshot } from "@/lib/protocol";
 import { cn } from "@/lib/utils";
@@ -42,17 +42,12 @@ export default function Mirror() {
   const agents = useAtomValue(agentsAtom);
   const setWarp = useSetAtom(warpTargetAtom);
   const open = ui.mode === "mirror";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key.toLowerCase() === "m") {
-        setUi({ mode: "roam" });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "The Mirror",
+    alsoCloseOn: ["m"], // the accelerator that opened it also closes it
+  });
 
   if (!open) return null;
 
@@ -64,7 +59,7 @@ export default function Mirror() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[720px] max-w-[95vw]">
+      <div {...dialog} className="w-[720px] max-w-[95vw]">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-accent">◇ The Mirror</h2>
           <span className="text-xs text-muted">

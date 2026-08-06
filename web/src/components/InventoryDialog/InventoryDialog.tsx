@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { MODELS } from "@/lib/models";
 import type { AgentSnapshot, ToolUseStat } from "@/lib/protocol";
 import { sendCommand } from "@/lib/socket";
@@ -58,14 +59,13 @@ export default function InventoryDialog() {
   const open = ui.mode === "inventory";
   const agentId = open ? ui.agentId : null;
 
-  useEffect(() => {
-    if (!open || !agentId) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "talk", agentId });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, agentId, setUi]);
+  // Escape steps back to the agent's talk dialog, not out to the world —
+  // the inventory is opened from inside it.
+  const dialog = useDialog({
+    open: open && agentId !== null,
+    onClose: () => agentId && setUi({ mode: "talk", agentId }),
+    label: "Inventory",
+  });
 
   if (ui.mode !== "inventory") return null;
   const agent = agents.find((a) => a.id === ui.agentId);
@@ -80,7 +80,10 @@ export default function InventoryDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[680px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[680px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-primary">🎒 {agent.label} — Inventory</h2>
           <button

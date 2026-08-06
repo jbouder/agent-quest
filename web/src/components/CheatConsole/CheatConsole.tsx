@@ -1,5 +1,6 @@
 import { useAtom, useSetAtom } from "jotai";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { localToast, sendCommand } from "@/lib/socket";
 import {
   cheatWarpAtom,
@@ -24,15 +25,12 @@ export default function CheatConsole() {
   const setRift = useSetAtom(riftTestAtom);
   const [text, setText] = useState("");
   const open = ui.mode === "cheat";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "`") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "Cheat console",
+    alsoCloseOn: ["`"], // the backtick that opened it also dismisses it
+  });
 
   if (!open) return null;
 
@@ -88,7 +86,7 @@ export default function CheatConsole() {
 
   return (
     <div className="absolute inset-x-0 top-0 z-30 border-b-2 border-primary bg-card/95 p-3">
-      <div className="mx-auto flex max-w-xl items-center gap-2">
+      <div {...dialog} className="mx-auto flex max-w-xl items-center gap-2">
         <span className="text-primary">›</span>
         <input
           autoFocus

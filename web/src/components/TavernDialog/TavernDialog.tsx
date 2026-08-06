@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { cn } from "@/lib/utils";
 import { agentsAtom, recentCommitsAtom, uiModeAtom } from "@/store/gameAtoms";
 
@@ -69,15 +70,11 @@ export default function TavernDialog() {
     return raw ? Number(raw) : null;
   });
   const open = ui.mode === "tavern";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "The Tavern",
+  });
 
   if (!open) return null;
 
@@ -101,7 +98,10 @@ export default function TavernDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[600px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[600px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-primary">🍺 The Tavern</h2>
           <button

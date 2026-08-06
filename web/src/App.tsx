@@ -22,6 +22,7 @@ import TalkDialog from "@/components/TalkDialog";
 import TavernDialog from "@/components/TavernDialog";
 import Toasts from "@/components/Toasts";
 import TutorialDialog, { TUTORIAL_DONE_KEY } from "@/components/TutorialDialog";
+import { releaseToWorld } from "@/lib/focus";
 import { nearbyAtom, uiModeAtom } from "@/store/gameAtoms";
 
 export default function App() {
@@ -34,6 +35,22 @@ export default function App() {
   useEffect(() => {
     if (!localStorage.getItem(TUTORIAL_DONE_KEY)) setUi({ mode: "tutorial" });
   }, [setUi]);
+
+  // Escape means the same thing everywhere: back out one level. With every
+  // dialog closed, the last level to back out of is the icon row itself —
+  // step off it and the world has its keys again. Dialogs claim Escape
+  // first, so this only fires once none are open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
+        return;
+      }
+      releaseToWorld();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // §19 — each customizable surface gets its own rift boundary, so a broken
   // edit's blast radius stays scoped: the world can tear without taking the

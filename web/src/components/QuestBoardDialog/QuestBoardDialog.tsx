@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useEffect } from "react";
+import { useDialog } from "@/components/Dialog";
 import type { SideQuest } from "@/lib/protocol";
 import {
   overridesAtom,
@@ -28,14 +28,11 @@ export default function QuestBoardDialog() {
   }));
   const quests = [...custom, ...scanned];
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "Quest Board",
+  });
 
   if (!open) return null;
 
@@ -46,7 +43,10 @@ export default function QuestBoardDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[560px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[560px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-primary">📋 Quest Board</h2>
           <button

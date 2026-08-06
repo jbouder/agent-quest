@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useMemo, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import type { ShopItem, ShopKind } from "@/lib/protocol";
 import { loadSeen, markShelfSeen, newItems, saveSeen } from "@/lib/shopSeen";
 import { sendCommand } from "@/lib/socket";
@@ -107,15 +108,11 @@ export default function ShopDialog() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const open = ui.mode === "shop";
   const kind = open ? ui.shop : null;
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: kind ? SHOPS[kind].title : "Shop",
+  });
 
   const stock = kind ? shops[kind] : null;
 
@@ -153,7 +150,10 @@ export default function ShopDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[640px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[640px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-1 flex items-baseline justify-between">
           <h2 className="text-primary">{shop.title}</h2>
           <button

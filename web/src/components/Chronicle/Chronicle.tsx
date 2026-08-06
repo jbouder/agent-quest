@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import type { JournalKind } from "@/lib/protocol";
 import { cn } from "@/lib/utils";
 import { agentsAtom, chronicleOpenAtom, journalAtom } from "@/store/gameAtoms";
@@ -27,6 +28,16 @@ export default function Chronicle() {
   const [kindFilter, setKindFilter] = useState<JournalKind | "all">("all");
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // A side panel, not a modal: it sits beside the world rather than over it,
+  // so Tab is free to leave it. Escape and J both close it.
+  const dialog = useDialog({
+    open,
+    onClose: () => setOpen(false),
+    label: "Chronicle",
+    alsoCloseOn: ["j"],
+    modal: false,
+  });
+
   const shown = lines.filter(
     (line) =>
       (agentFilter === "all" || line.agentId === agentFilter) &&
@@ -46,7 +57,10 @@ export default function Chronicle() {
     agents.find((a) => a.id === agentId)?.label ?? agentId;
 
   return (
-    <div className="absolute top-0 right-0 bottom-0 z-10 flex w-96 max-w-[80vw] flex-col border-l-2 border-border bg-card/95">
+    <div
+      {...dialog}
+      className="absolute top-0 right-0 bottom-0 z-10 flex w-96 max-w-[80vw] flex-col border-l-2 border-border bg-card/95"
+    >
       <div className="flex items-baseline justify-between border-b border-border px-3 py-2">
         <h2 className="text-sm text-accent">📜 Chronicle</h2>
         <button
@@ -54,7 +68,7 @@ export default function Chronicle() {
           onClick={() => setOpen(false)}
           className="text-xs text-muted hover:text-foreground"
         >
-          close (J)
+          close (Esc/J)
         </button>
       </div>
       <div className="flex gap-2 border-b border-border px-3 py-1.5">

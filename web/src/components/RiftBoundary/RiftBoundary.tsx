@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import { Component, type ReactNode } from "react";
+import { Component, createRef, type ReactNode } from "react";
 import { loadOverrides, revertDepth, revertOverrides } from "@/lib/overrides";
 import { localToast } from "@/lib/socket";
 import { gameStore, overridesAtom, riftTestAtom } from "@/store/gameAtoms";
@@ -24,13 +24,17 @@ interface State {
  */
 export default class RiftBoundary extends Component<Props, State> {
   state: State = { torn: false, detail: "" };
+  private sealRef = createRef<HTMLButtonElement>();
 
   static getDerivedStateFromError(error: unknown): Partial<State> {
     return { torn: true, detail: String(error) };
   }
 
   componentDidCatch(): void {
-    // The crash is presented in-world below; nothing else to report.
+    // A rift interrupts whatever the player was doing, and the element they
+    // were on is likely gone with the surface — put the keyboard on the way
+    // out. The crash itself is presented in-world below.
+    this.sealRef.current?.focus();
   }
 
   /** Remount the surface without touching the overrides. */
@@ -58,7 +62,12 @@ export default class RiftBoundary extends Component<Props, State> {
     if (!this.state.torn) return this.props.children;
     return (
       <div className="pointer-events-auto absolute inset-x-0 top-1/3 z-40 flex justify-center px-4">
-        <div className="w-[520px] max-w-full rounded-lg border-2 border-destructive bg-card p-4 shadow-xl">
+        <div
+          role="alertdialog"
+          aria-modal
+          aria-label={`A rift has torn open over ${this.props.surface}`}
+          className="w-[520px] max-w-full rounded-lg border-2 border-destructive bg-card p-4 shadow-xl"
+        >
           <h2 className="mb-1 text-destructive">
             ⚡ A rift has torn open over {this.props.surface}
           </h2>
@@ -71,6 +80,7 @@ export default class RiftBoundary extends Component<Props, State> {
           </p>
           <div className="flex gap-2">
             <button
+              ref={this.sealRef}
               type="button"
               onClick={this.seal}
               className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"

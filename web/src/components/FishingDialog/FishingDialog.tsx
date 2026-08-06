@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { longWaitAtom, uiModeAtom } from "@/store/gameAtoms";
 
 /** Pure so the catch table can be tested without waiting on a timer. */
@@ -32,15 +33,11 @@ export default function FishingDialog() {
   const [casting, setCasting] = useState(false);
   const castSeq = useRef(0);
   const open = ui.mode === "fishing";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "The Dock",
+  });
 
   // §9b — "naturally ends when the build does".
   useEffect(() => {
@@ -61,7 +58,10 @@ export default function FishingDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[480px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[480px] max-w-[95vw] rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-primary">🎣 The Dock</h2>
           <button

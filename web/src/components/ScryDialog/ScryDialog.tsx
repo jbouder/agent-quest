@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { sendCommand } from "@/lib/socket";
 import { defaultCwdAtom, uiModeAtom } from "@/store/gameAtoms";
 
@@ -10,15 +11,11 @@ export default function ScryDialog() {
   const cwd = useAtomValue(defaultCwdAtom);
   const [query, setQuery] = useState("");
   const open = ui.mode === "scry";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setUi({ mode: "roam" });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, setUi]);
+  const dialog = useDialog({
+    open,
+    onClose: () => setUi({ mode: "roam" }),
+    label: "The Scrying Pool",
+  });
 
   if (!open) return null;
 
@@ -37,7 +34,10 @@ export default function ScryDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="w-[480px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4">
+      <div
+        {...dialog}
+        className="w-[480px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4"
+      >
         <h2 className="mb-1 text-accent">🔮 The Scrying Pool</h2>
         <p className="mb-3 text-xs text-muted">
           Ask, and a scout climbs the watchtower to search the wider world. (A

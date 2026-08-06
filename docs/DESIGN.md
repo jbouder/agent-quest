@@ -279,6 +279,31 @@ consistent button rather than a memorized one:
   menu action, rather than introducing its own separate interaction
   pattern.
 
+#### 7a-i. One keyboard contract for every dialog
+
+The same argument that makes *interact* a single consistent button
+applies to the overlays once they're open: a dialog whose Esc works is
+worse than useless if the next dialog's doesn't, because the player
+stops trusting the key. So every overlay signs one contract, enforced
+by `useDialog` and a test that renders all of them:
+
+- **Esc closes it**, and only the top-most open dialog answers, so a
+  stack unwinds one level per press.
+- **Tab and Shift+Tab cycle inside it.** A modal that lets Tab wander
+  out into the world behind it is lying about being modal.
+- **Focus lands in the dialog on open and returns to whatever opened
+  it on close** — the icon-row button if you got there by keyboard,
+  nothing if you got there by mouse.
+- **Every control is a real `<button>`**, so Enter and Space activate
+  it without a hand-rolled key handler.
+
+This has a consequence for the world's input: Phaser captures Enter and
+Space globally (and `preventDefault`s them), which silently steals the
+activation keypress from any focused DOM control. The scene therefore
+stands down whenever a control has focus, and hands the keyboard back
+when the player clicks the world or presses Esc with nothing open —
+otherwise WASD dies the first time you Tab to the icon row.
+
 ### 7b. Slashing (environmental interaction)
 
 The sword already exists as the interrupt action (§7) — giving it a

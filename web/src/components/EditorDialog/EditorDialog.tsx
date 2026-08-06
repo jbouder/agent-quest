@@ -1,5 +1,6 @@
 import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
+import { useDialog } from "@/components/Dialog";
 import { AREAS } from "@/game/areas";
 import {
   applyOverrides,
@@ -40,17 +41,6 @@ export default function EditorDialog() {
     wasOpen.current = open;
   }, [open, live]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  if (!open) return null;
-
   /** Leaving without applying restores the last persisted world. */
   const close = () => {
     const persisted = loadOverrides().current;
@@ -59,6 +49,10 @@ export default function EditorDialog() {
     }
     setUi({ mode: "roam" });
   };
+
+  const dialog = useDialog({ open, onClose: close, label: "The World Codex" });
+
+  if (!open) return null;
 
   const preview = (next: WorldOverrides = draft) => {
     const clean = sanitizeOverrides(next);
@@ -108,7 +102,10 @@ export default function EditorDialog() {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/85">
-      <div className="flex max-h-[90vh] w-[680px] max-w-[95vw] flex-col rounded-lg border-2 border-primary bg-card p-4">
+      <div
+        {...dialog}
+        className="flex max-h-[90vh] w-[680px] max-w-[95vw] flex-col rounded-lg border-2 border-primary bg-card p-4"
+      >
         <div className="mb-1 flex items-baseline justify-between">
           <h2 className="text-primary">✎ The World Codex</h2>
           <div className="flex gap-3 text-xs">

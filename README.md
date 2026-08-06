@@ -62,6 +62,12 @@ persistent icon row (top right) opens the global overlays: ✨ Summon,
 | `J` | The Chronicle: every agent's journal, one filterable feed |
 | `` ` `` | Cheat console: noclip, speed, warp, reveal, god mode |
 
+Every dialog answers the same keys: `Tab` / `Shift+Tab` move between its
+controls and stay inside it, `Enter` or `Space` presses the focused one,
+and `Esc` closes it. Focus returns to whatever opened the dialog, so
+`Esc` with nothing open steps off the icon row and gives the keyboard
+back to the world.
+
 Configuration lives in a single `.env` at the repo root (see
 [.env.example](./.env.example)): demo mode, budget, agent cap, port, and
 `ANTHROPIC_API_KEY` (if unset, the SDK falls back to this machine's

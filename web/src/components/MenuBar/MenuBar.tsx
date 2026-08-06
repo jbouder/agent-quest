@@ -67,14 +67,23 @@ export default function MenuBar() {
   ];
 
   return (
-    <div className="pointer-events-auto absolute top-3 right-3 z-10 flex gap-1">
+    <div
+      role="toolbar"
+      aria-label="Overlays"
+      className="pointer-events-auto absolute top-3 right-3 z-10 flex gap-1"
+    >
       {buttons.map((button) => (
         <button
           key={button.label}
           type="button"
           title={button.label}
           aria-label={button.label}
+          aria-pressed={button.active}
           onClick={button.onClick}
+          // Clicking must not park focus on the button, or the world would
+          // hand its keys to the icon row and WASD would stop working. Tab
+          // still focuses it, and Enter/Space still activate it.
+          onMouseDown={(e) => e.preventDefault()}
           className={cn(
             "rounded border bg-card/85 px-2 py-1 text-sm hover:border-accent",
             button.active ? "border-accent" : "border-border",
