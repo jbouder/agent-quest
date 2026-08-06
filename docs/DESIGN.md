@@ -140,6 +140,11 @@ Opens like a classic item grid:
   actually do" view that's normally invisible in the CLI.
 - Items actually **used this session** glow/highlight, distinguishing
   "available" from "actually reached for."
+- Per §7a it's a **global overlay**: the 🎒 in the icon row (or `I`)
+  opens it without a walk or a conversation, with a row of names to
+  switch whose pack you're looking in. Before anything is summoned there
+  is no session loadout to show, so it shows what the repo itself has
+  installed (§5b) — the button is never dead.
 
 ### 5a. Model as equipment slot
 

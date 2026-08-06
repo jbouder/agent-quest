@@ -79,18 +79,48 @@ const STALLS = inArea("shopping", 640, 420);
 const PLAYER_SPEED = 190;
 const INTERACT_RANGE = 64;
 
-/** Fixed idle spots for pinned agents, ringing the plaza (§12). */
+/**
+ * Fixed idle spots for pinned agents, ringing the plaza (§12). Spaced wider
+ * apart than the sprites need: each NPC carries a name plate and a thought
+ * bubble up to ~158px wide, and two of those crossing is as unreadable as
+ * two sprites in the same pixel.
+ */
 const SLOTS = [
   sq(500, 350),
   sq(780, 350),
   sq(480, 520),
   sq(800, 520),
-  sq(570, 590),
-  sq(710, 590),
+  sq(500, 600),
+  sq(780, 600),
 ];
 
 function slotFor(index: number): { x: number; y: number } {
   return SLOTS[index % SLOTS.length] ?? PLAZA;
+}
+
+/**
+ * How far apart arriving NPCs' lanes are. Wide enough that the name plates
+ * clear each other, and roughly the spread of the slots they're heading for,
+ * so nobody has to cross anybody else's path.
+ */
+const ARRIVAL_LANE = 64;
+
+/**
+ * §8 — where an arriving NPC sets out from. Everyone used to start on the
+ * same pixel, so a batch of summons — or a reload with several agents already
+ * live — piled every sprite, name plate, and bubble into one illegible blob
+ * for the length of the walk. One lane per slot, so a crowd walks in as a
+ * crowd and you can count it.
+ */
+function arrivalFrom(
+  base: { x: number; y: number },
+  slotIndex: number,
+): { x: number; y: number } {
+  const lane = slotIndex - (MAX_VILLAGE_NPCS - 1) / 2;
+  return {
+    x: base.x + lane * ARRIVAL_LANE,
+    y: base.y - 20 + Math.abs(lane) * 8,
+  };
 }
 
 /** §15 Easter eggs — the village keeps its oddities; the duck follows the pond. */
@@ -222,6 +252,14 @@ class NpcView {
   private lastTier: string | null = null;
   private finishedTasks = 0;
   private endedHandled = false;
+  /**
+   * True while this NPC is crossing the fields — walking in, or off to camp.
+   * A thought bubble is ~158px wide against a 20px sprite, so a group on the
+   * move with their bubbles up is a wall of overlapping text. They think out
+   * loud once they're in place.
+   */
+  private inTransit = true;
+  private wantsBubble = false;
   /** §13 — how many scratch marks returning subagents have left so far. */
   private subagentMarks = 0;
 
@@ -309,7 +347,16 @@ class NpcView {
       y: slot.y,
       duration: 2200,
       ease: "Sine.easeInOut",
+      onComplete: () => {
+        this.inTransit = false;
+        this.applyBubble();
+      },
     });
+  }
+
+  /** The bubble is held back until this NPC has taken its post. */
+  private applyBubble(): void {
+    this.bubble.setVisible(this.wantsBubble && !this.inTransit);
   }
 
   get x(): number {
@@ -323,6 +370,9 @@ class NpcView {
   walkToCampAndDestroy(camp: { x: number; y: number }): void {
     this.statusTween?.remove();
     this.statusTween = null;
+    // Same reason as the walk in: no bubble while crossing the village.
+    this.inTransit = true;
+    this.applyBubble();
     this.scene.tweens.add({
       targets: this.container,
       x: camp.x,
@@ -359,7 +409,8 @@ class NpcView {
         ? `${agent.thought.slice(0, 63)}…`
         : agent.thought;
     this.bubble.setText(thought);
-    this.bubble.setVisible(thought.length > 0 && agent.status !== "ended");
+    this.wantsBubble = thought.length > 0 && agent.status !== "ended";
+    this.applyBubble();
     this.statusIcon.setText(STATUS_ICON[agent.status]);
 
     this.updateTasks(agent);
@@ -534,6 +585,7 @@ export class VillageScene extends Phaser.Scene {
   private interactKeys: Phaser.Input.Keyboard.Key[] = [];
   private mirrorKey!: Phaser.Input.Keyboard.Key;
   private chronicleKey!: Phaser.Input.Keyboard.Key;
+  private inventoryKey!: Phaser.Input.Keyboard.Key;
   private cheatKey!: Phaser.Input.Keyboard.Key;
   private npcs = new Map<string, NpcView>();
   private endedMarkers = new Set<string>();
@@ -617,6 +669,7 @@ export class VillageScene extends Phaser.Scene {
     ];
     this.mirrorKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
     this.chronicleKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.inventoryKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.cheatKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
 
     this.prompt = this.add
@@ -1142,7 +1195,7 @@ export class VillageScene extends Phaser.Scene {
         this,
         agent,
         slotFor(slotIndex),
-        { x: ENTRANCE.x, y: ENTRANCE.y - 20 },
+        arrivalFrom(ENTRANCE, slotIndex),
         () => this.trigger({ kind: "npc", agentId: agent.id }),
         (x, y) => this.placeTrophy(agent.id, x, y),
       );
@@ -1374,7 +1427,7 @@ export class VillageScene extends Phaser.Scene {
       this,
       agent,
       slotFor(slotIndex),
-      { x: CAMP.x, y: CAMP.y + 26 },
+      arrivalFrom({ x: CAMP.x, y: CAMP.y + 46 }, slotIndex),
       () => this.trigger({ kind: "npc", agentId: id }),
       (x, y) => this.placeTrophy(id, x, y),
     );
@@ -1590,6 +1643,14 @@ export class VillageScene extends Phaser.Scene {
       }
       if (Phaser.Input.Keyboard.JustDown(this.chronicleKey)) {
         gameStore.set(chronicleOpenAtom, !gameStore.get(chronicleOpenAtom));
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.inventoryKey)) {
+        // §5/§7a — the pack, with no agent named: the dialog picks one.
+        gameStore.set(uiModeAtom, {
+          mode: "inventory",
+          agentId: null,
+          origin: "menu",
+        });
       }
       if (Phaser.Input.Keyboard.JustDown(this.cheatKey)) {
         gameStore.set(uiModeAtom, { mode: "cheat" });

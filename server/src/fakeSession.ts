@@ -115,7 +115,7 @@ export class FakeAgentSession {
 
   steer(text: string): void {
     if (this.ended) return;
-    this.events.onJournal("text", `You: ${text.slice(0, 80)}`);
+    this.events.onJournal("text", `You: ${text}`);
     this.status = "thinking";
     this.thought = "considering your words…";
     this.step = Math.max(0, this.step - 4);

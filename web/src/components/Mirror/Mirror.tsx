@@ -97,7 +97,11 @@ export default function Mirror() {
                   type="button"
                   title={`${agent.label}'s inventory`}
                   onClick={() =>
-                    setUi({ mode: "inventory", agentId: agent.id })
+                    setUi({
+                      mode: "inventory",
+                      agentId: agent.id,
+                      origin: "talk",
+                    })
                   }
                   className="absolute right-2 bottom-2 text-sm opacity-60 hover:opacity-100"
                 >

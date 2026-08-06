@@ -38,6 +38,19 @@ export default function MenuBar() {
         setUi(ui.mode === "mirror" ? { mode: "roam" } : { mode: "mirror" }),
     },
     {
+      // §5/§7a — the inventory is a global overlay too: what your agents are
+      // carrying shouldn't need a walk and a conversation to look at.
+      icon: "🎒",
+      label: "Inventory (I)",
+      active: ui.mode === "inventory",
+      onClick: () =>
+        setUi(
+          ui.mode === "inventory"
+            ? { mode: "roam" }
+            : { mode: "inventory", agentId: null, origin: "menu" },
+        ),
+    },
+    {
       icon: "🗺",
       label: "Map", // §20 — geography, discovery, fast travel
       active: ui.mode === "map",

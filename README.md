@@ -119,9 +119,13 @@ Claude Code credentials).
 - **Quest log** — each agent's task list, live from the SDK's task
   tracking; plan mode shows up as a draft quest log you approve before
   work starts.
-- **Inventory** — the tools, skills, and MCP servers an agent carries,
-  with a used-this-session glow. The model is an equipment slot with
-  real mid-session re-equip.
+- **Inventory (`I`)** — the tools, skills, and MCP servers an agent
+  carries, with a used-this-session glow, switchable between agents. The
+  model is an equipment slot with real mid-session re-equip. With nobody
+  summoned it shows what's installed in the repo itself.
+- **Talking** — the talk dialog docks at the bottom of the screen and
+  expands to full screen when an answer is worth reading properly.
+  Nothing in the transcript is truncated.
 
 ### A living world built from your repo
 

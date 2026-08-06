@@ -42,6 +42,12 @@ const ENTRIES: Entry[] = [
   },
   {
     section: "Overlays",
+    name: "Inventory 🎒",
+    detail:
+      "What your agents are carrying — skills, tools, MCP servers, and the model as an equipment slot. Icon row, top right; switch between agents inside it. With nobody summoned it shows what's installed in the repo instead. Accelerator: I.",
+  },
+  {
+    section: "Overlays",
     name: "Chronicle 📜",
     detail:
       "One chronological feed of every agent's journal, filterable by agent and event type. Accelerator: J.",
@@ -60,7 +66,7 @@ const ENTRIES: Entry[] = [
     section: "Agent actions",
     name: "Talk / steer (wand)",
     detail:
-      "Talk to an agent to inject a new instruction mid-task. Works while it's running.",
+      "Talk to an agent to inject a new instruction mid-task. Works while it's running. The dialog docks at the bottom; ⤢ expand grows it to full screen for reading a long answer, and the transcript keeps whole messages either way.",
   },
   {
     section: "Agent actions",
@@ -84,7 +90,7 @@ const ENTRIES: Entry[] = [
     section: "Agent actions",
     name: "Inventory & equipment",
     detail:
-      "From the talk dialog, or the 🎒 on any Mirror card (so it's reachable from anywhere): skills, plugins, MCP servers, and the model as an equipment slot — swap it mid-task for a visible re-equip.",
+      "From the 🎒 in the icon row, the talk dialog, or the 🎒 on any Mirror card: skills, plugins, MCP servers, and the model as an equipment slot — swap it mid-task for a visible re-equip.",
   },
   {
     section: "Places",

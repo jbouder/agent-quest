@@ -1,11 +1,16 @@
 import { useAtom, useAtomValue } from "jotai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDialog } from "@/components/Dialog";
 import { contextHealth, formatTokens, formatUsd } from "@/lib/format";
 import type { AgentSnapshot } from "@/lib/protocol";
 import { sendCommand } from "@/lib/socket";
 import { cn } from "@/lib/utils";
-import { agentsAtom, journalAtom, uiModeAtom } from "@/store/gameAtoms";
+import {
+  agentsAtom,
+  journalAtom,
+  talkExpandedAtom,
+  uiModeAtom,
+} from "@/store/gameAtoms";
 
 const STATUS_LABEL: Record<AgentSnapshot["status"], string> = {
   summoning: "answering the summons",
@@ -19,17 +24,33 @@ const STATUS_LABEL: Record<AgentSnapshot["status"], string> = {
   error: "wounded (error)",
 };
 
+/** How much of the conversation the two sizes keep on screen. */
+const DOCKED_LINES = 8;
+const EXPANDED_LINES = 200;
+
 export default function TalkDialog() {
   const [ui, setUi] = useAtom(uiModeAtom);
   const agents = useAtomValue(agentsAtom);
   const journal = useAtomValue(journalAtom);
+  const [expanded, setExpanded] = useAtom(talkExpandedAtom);
   const [text, setText] = useState("");
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
   const dialog = useDialog({
     open: ui.mode === "talk",
     onClose: () => setUi({ mode: "roam" }),
     label: "Talk to agent",
   });
+
+  // Follow the conversation: re-pin to the bottom when a line arrives, when
+  // you turn to a different agent, or when the panel changes size. Setting
+  // scrollTop rather than scrollIntoView keeps the scrolling inside the
+  // transcript — the world sits in a fixed viewport that must not be nudged.
+  const pin = `${ui.mode === "talk" ? ui.agentId : ""}:${journal.length}:${expanded}`;
+  useEffect(() => {
+    const box = transcriptRef.current;
+    if (box && pin) box.scrollTop = box.scrollHeight;
+  }, [pin]);
 
   if (ui.mode !== "talk") return null;
   const agent = agents.find((a) => a.id === ui.agentId);
@@ -43,14 +64,28 @@ export default function TalkDialog() {
   };
 
   const health = contextHealth(agent.contextTokens, agent.contextLimit);
-  const lines = journal.filter((l) => l.agentId === agent.id).slice(-8);
+  const lines = journal
+    .filter((l) => l.agentId === agent.id)
+    .slice(expanded ? -EXPANDED_LINES : -DOCKED_LINES);
   const busy = agent.status === "thinking" || agent.status === "tool_running";
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
+    <div
+      className={cn(
+        "absolute z-20 flex",
+        expanded
+          ? "inset-0 items-center justify-center bg-background/85 p-4"
+          : "inset-x-0 bottom-0 justify-center pb-4",
+      )}
+    >
       <div
         {...dialog}
-        className="w-[640px] max-w-[95vw] rounded-lg border-2 border-accent bg-card p-4 shadow-xl"
+        className={cn(
+          "rounded-lg border-2 border-accent bg-card p-4 shadow-xl",
+          expanded
+            ? "flex h-full w-[900px] max-w-[95vw] flex-col"
+            : "w-[640px] max-w-[95vw]",
+        )}
       >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-accent">
@@ -62,10 +97,29 @@ export default function TalkDialog() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setUi({ mode: "inventory", agentId: agent.id })}
+              onClick={() =>
+                setUi({
+                  mode: "inventory",
+                  agentId: agent.id,
+                  origin: "talk",
+                })
+              }
               className="text-xs text-primary hover:opacity-80"
             >
               🎒 inventory
+            </button>
+            {/* A long answer doesn't fit in a docked strip; give it the screen. */}
+            <button
+              type="button"
+              title={
+                expanded
+                  ? "Shrink back to the bottom of the screen"
+                  : "Fill the screen to read the whole conversation"
+              }
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs text-accent hover:opacity-80"
+            >
+              {expanded ? "⤡ shrink" : "⤢ expand"}
             </button>
             <button
               type="button"
@@ -139,7 +193,15 @@ export default function TalkDialog() {
           </div>
         )}
 
-        <div className="mb-2 max-h-32 overflow-y-auto rounded border border-border bg-background p-2 text-xs">
+        <div
+          ref={transcriptRef}
+          className={cn(
+            "mb-2 overflow-y-auto rounded border border-border bg-background p-2 text-xs",
+            // Docked: a strip at the bottom of the screen. Expanded: whatever
+            // room is left after the fixed rows above and below it.
+            expanded ? "min-h-0 flex-1 leading-relaxed" : "max-h-32",
+          )}
+        >
           {lines.length === 0 && (
             <p className="text-muted">No tale to tell yet.</p>
           )}
@@ -147,6 +209,12 @@ export default function TalkDialog() {
             <p
               key={`${line.ts}-${line.text}`}
               className={cn(
+                // Agents write in paragraphs and bullet lists; keep their
+                // shape instead of collapsing everything into one blob.
+                "mb-1 whitespace-pre-wrap break-words",
+                // Docked, a long answer would push everything else out of
+                // view, so it's clipped with the expand button right above.
+                !expanded && "line-clamp-3",
                 line.kind === "error" && "text-destructive",
                 line.kind === "permission" && "text-primary",
                 line.kind === "result" && "text-accent",

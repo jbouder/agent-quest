@@ -139,6 +139,11 @@ function truncate(text: string, max = 90): string {
   return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
 }
 
+/** Same words, whatever the wrapping — used to spot a repeated answer. */
+function sameWords(a: string, b: string): boolean {
+  return a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
+}
+
 /** Compact human-readable summary of a tool call for the thought bubble. */
 export function summarizeToolInput(
   toolName: string,
@@ -261,6 +266,12 @@ export class AgentSession {
   private costUsd = 0;
   private sessionId: string | null = null;
   private lastResult: string | null = null;
+  /**
+   * What the current turn's assistant message actually said. A turn's
+   * `result` is that same text handed back a second time, so the journal
+   * checks against this before echoing it (see the `result` case).
+   */
+  private lastAssistantText: string | null = null;
   private compactions = 0;
   private inventory: AgentInventory | null = null;
   private toolUses: Record<string, ToolUseStat> = {};
@@ -389,7 +400,9 @@ export class AgentSession {
     if (this.ended) return;
     this.queue.push(text);
     this.setStatus("thinking", "considering your words…");
-    this.events.onJournal("text", `You: ${truncate(text)}`);
+    // Your own words go in whole too — the transcript is the only place
+    // they're kept, and a clipped question reads as a different question.
+    this.events.onJournal("text", `You: ${text}`);
   }
 
   /** §7 sword — interrupt the current turn. The tool call has to unwind
@@ -658,6 +671,9 @@ export class AgentSession {
           // request plus what it generated.
           this.contextTokens = input + cacheRead + cacheCreate + output;
         }
+        // Everything this message says out loud, in order, so the turn's
+        // result can be recognized as a repeat of it rather than news.
+        const said: string[] = [];
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
             const input = (block.input ?? {}) as Record<string, unknown>;
@@ -718,10 +734,16 @@ export class AgentSession {
               `→ ${this.outstandingTools.get(block.id)}`,
             );
           } else if (block.type === "text" && block.text.trim().length > 0) {
+            // The thought bubble is one line over an NPC's head, but the
+            // journal keeps the whole thing — the talk dialog can be
+            // expanded to read it, and a clipped answer can't be un-clipped.
+            const text = block.text.trim();
+            said.push(text);
             this.setStatus("thinking", truncate(block.text));
-            this.events.onJournal("text", truncate(block.text, 200));
+            this.events.onJournal("text", text);
           }
         }
+        if (said.length > 0) this.lastAssistantText = said.join("\n\n");
         break;
       }
 
@@ -775,7 +797,16 @@ export class AgentSession {
           if (!this.sleeping) {
             this.setStatus("idle", truncate(message.result));
           }
-          this.events.onJournal("result", truncate(message.result, 300));
+          // A turn's result *is* its final assistant message. Printing both
+          // showed every answer twice, so when they match the journal keeps
+          // the beat and drops the repeat.
+          const said = this.lastAssistantText;
+          this.events.onJournal(
+            "result",
+            said && sameWords(said, message.result)
+              ? "✓ turn complete"
+              : message.result,
+          );
         } else {
           this.setStatus("error", message.subtype);
           this.events.onJournal(
@@ -783,6 +814,8 @@ export class AgentSession {
             `${message.subtype}: ${message.errors.join("; ") || "turn failed"}`,
           );
         }
+        // The turn is over either way; the next one says its own words.
+        this.lastAssistantText = null;
         this.events.onSpend(deltaUsd, deltaTokens);
         break;
       }

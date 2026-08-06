@@ -104,8 +104,14 @@ export default function Chronicle() {
               : "Nothing matches these filters."}
           </p>
         )}
+        {/* The journal keeps whole messages so the talk dialog can be expanded
+            to read them. Here the point is the sweep of events, so a long line
+            is clamped instead of flooding the feed. */}
         {shown.map((line) => (
-          <p key={`${line.ts}-${line.agentId}-${line.text.slice(0, 20)}`}>
+          <p
+            key={`${line.ts}-${line.agentId}-${line.text.slice(0, 20)}`}
+            className="mb-1 line-clamp-3 whitespace-pre-wrap break-words"
+          >
             <span className="text-muted">
               {new Date(line.ts).toLocaleTimeString([], {
                 hour12: false,

@@ -143,6 +143,13 @@ export const appendJournalAtom = atom(null, (get, set, line: JournalLine) => {
 /** §6a — the Chronicle: the consolidated cross-agent journal drawer. */
 export const chronicleOpenAtom = atom<boolean>(false);
 
+/**
+ * §7 talk — the dialog docks at the bottom by default and grows to fill the
+ * screen when you want to actually read a long answer. Lives out here so the
+ * choice survives closing the dialog and talking to someone else.
+ */
+export const talkExpandedAtom = atom<boolean>(false);
+
 export interface Toast {
   id: number;
   level: "info" | "warn" | "error";
@@ -156,7 +163,16 @@ export type UiMode =
   | { mode: "summon" }
   | { mode: "talk"; agentId: string }
   | { mode: "mirror" }
-  | { mode: "inventory"; agentId: string }
+  /**
+   * §5/§7a — the inventory. `agentId: null` means "whoever you're carrying" —
+   * opened from the icon row rather than from inside a conversation, so it
+   * picks an agent itself. `origin` is where Escape goes back to.
+   */
+  | {
+      mode: "inventory";
+      agentId: string | null;
+      origin: "talk" | "menu";
+    }
   | { mode: "board" }
   | { mode: "tavern" }
   | { mode: "scry" }
