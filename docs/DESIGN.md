@@ -11,6 +11,32 @@ The core idea: this is an observability tool wearing a game skin, not a
 game with observability bolted on. Every mechanic below maps to a real
 signal or a real control action.
 
+All seven build phases are shipped — §17 is the record of what landed
+and what comes next.
+
+## Contents
+
+1. [World & movement](#1-world--movement) · [1a. A bigger world](#1a-a-bigger-world-multiple-areas)
+2. [Two separate resources](#2-two-separate-resources-the-key-design-decision)
+3. [NPCs (agents)](#3-npcs-agents)
+4. [The Mirror](#4-the-mirror-agent-overview)
+5. [Inventory](#5-inventory-screen-skills--plugins) · [5a. Model as equipment](#5a-model-as-equipment-slot) · [5b. Shops](#5b-shops-installing-skills-plugins-mcps)
+6. [Quest log & Journal](#6-quest-log--journal) · [6a. The Chronicle](#6a-the-chronicle-consolidated-cross-agent-journal)
+7. [Weapons & tools](#7-weapons--tools-control-actions) · [7a. Interaction model](#7a-interaction-model-simplified) · [7b. Slashing](#7b-slashing-environmental-interaction)
+8. [Summoning](#8-summoning-agents-from-the-app) · [8a. Other entry points](#8a-other-ways-an-npc-can-appear-not-just-summoning)
+9. [Side quests](#9-side-quests--staying-engaged-while-agents-work) · [9a. Quest board](#9a-quest-board-anchor-mechanic) · [9b. Quest types](#9b-side-quest-types) · [9c. Rewind](#9c-rollback--revert--rewinding-time) · [9d. The Tavern](#9d-the-tavern-player-chosen-downtime) · [9e. The Scrying Pool](#9e-the-scrying-pool--watchtower-web-search)
+10. [Data model](#10-data-model-conceptual)
+11. [Control flow](#11-control-flow-summary)
+12. [Resolved design decisions](#12-resolved-design-decisions)
+13. [Subagent lifecycle](#13-subagent-lifecycle)
+14. [Additional feature mappings](#14-additional-claude-code-feature-mappings)
+15. [Easter eggs](#15-easter-eggs)
+16. [Cheat codes](#16-cheat-codes)
+17. [Enhancement plan](#17-enhancement-plan)
+18. [Tutorials & onboarding](#18-tutorials--onboarding)
+19. [Customization & extensibility](#19-customization--extensibility)
+20. [The Map](#20-the-map-world-navigation)
+
 ---
 
 ## 1. World & movement
@@ -25,9 +51,9 @@ signal or a real control action.
 
 ### 1a. A bigger world, multiple areas
 
-The village square doesn't have to be the whole world — it's the hub.
-Expanding outward into named areas gives everything already in this doc
-room to breathe instead of competing for the same patch of ground:
+The village square isn't the whole world — it's the hub. Expanding
+outward into named areas gives everything in this doc room to breathe
+instead of competing for the same patch of ground:
 
 - **Village Square** — the hub. Quest board (§9a), gatekeeper at the
   edge (§14), central and easy to return to.
@@ -334,7 +360,8 @@ supporting:
   taking control is a genuine handoff, not a passive view. Worth a
   visible "you've taken the reins" beat (e.g. the gatekeeper from §14
   stepping aside) since Agent Quest is now the thing actually driving
-  that terminal, not just watching it.
+  that terminal, not just watching it. (How this resolved in practice —
+  fork-on-attach — is recorded in §17.)
 
 ## 9. Side quests / staying engaged while agents work
 
@@ -410,7 +437,7 @@ undoes changes, not an erasure of history. The original trophy's
 existence (and the fact it was later rewound) both stay visible, rather
 than the structure just disappearing as if the work never happened.
 
-## 9d. The Tavern (player-chosen downtime)
+### 9d. The Tavern (player-chosen downtime)
 
 A different category from §9a/§9b: those side quests are automated and
 repo-driven, generated *for* you. The Tavern is the opposite — a
@@ -440,7 +467,7 @@ might; it's explicitly optional and low-stakes.
   "content" and more permission to just relax for a minute while
   something runs.
 
-## 9e. The Scrying Pool / Watchtower (web search)
+### 9e. The Scrying Pool / Watchtower (web search)
 
 A location distinct from the Mirror (§4), which looks inward at your
 agents — this one looks outward at the web.
@@ -460,169 +487,6 @@ agents — this one looks outward at the web.
   pulls from multiple sources, several scrolls appear together rather
   than one — an honest visual cue that the answer drew on more than a
   single source, without needing to open anything to know that.
-
-## 15. Easter eggs
-
-Unlike the rest of this doc, these don't need airtight design rules —
-they're allowed to just be delightful and slightly arbitrary. A grab
-bag worth keeping in mind for later, not fully specced:
-
-- A dusty statue in a forgotten corner labeled with a deprecated model
-  name (Claude 1, Claude 2) — a little graveyard-of-versions joke, with
-  the currently-equipped model tier (§5a) glowing brightly by contrast.
-- An old man in a cave who hands you a cosmetic shield with a line like
-  "it's dangerous to `git push --force` alone — take this."
-- A skeleton in the overgrown-ruins tech-debt structure (§9b) wearing a
-  name tag that just says "TODO: fix later."
-- A rubber duck NPC by a pond that, if you talk to it, just repeats your
-  last steering instruction back to you — actual rubber-duck debugging,
-  staged as a joke.
-- Push on a wall in an empty corner of the village enough times and it
-  cracks open — classic secret-passage energy, reward is cosmetic only.
-- If an agent's journal (§6) logs an unusually long unbroken streak of
-  the same tool call, a small "are you okay?" bubble appears above it.
-- Summon (§8) way past any reasonable budget and get a dry, self-aware
-  line back rather than a plain error — "the mirror looks back at you,
-  unimpressed."
-
-## 16. Cheat codes
-
-Mostly for fun, same spirit as §15 — with one exception that needs to
-stay honest about what it actually does.
-
-**Cosmetic / dev-convenience:**
-- **Noclip** — fly over the village ignoring collision/walls, purely
-  cosmetic, just for getting around fast or admiring the map.
-- **Speed boost** — temporary faster movement, purely cosmetic.
-- **Level select** — jump straight to the Mirror (§4), or teleport
-  directly to any named agent, skipping the walk.
-- **Reveal map** — light up all Easter eggs (§15) and hidden
-  interactions at once, for anyone who wants to see everything without
-  hunting.
-- **Debug console** — a dev-console overlay that dumps raw telemetry
-  across every active NPC at once, bypassing the Mirror's one-at-a-time
-  browsing.
-
-**God mode = toggling Auto Mode, not disabling safety.**
-The cheat doesn't remove permission gates — it hands them to the
-classifier instead of you. Entering it flips the gatekeeper NPC (§14)
-from asking *you* before every risky tool call to acting on the safety
-classifier's own judgment, the same real Auto Mode feature already in
-the doc. Visually, the gatekeeper stops looking to you before deciding.
-You stop being the bottleneck, the agent moves faster and more
-autonomously, but the actual safety mechanism stays fully intact
-underneath — a real feature getting a fun unlock moment, not a toggle
-that quietly turns something important off.
-
-True `--dangerously-skip-permissions` — genuinely no gates at all —
-stays out of this list entirely on purpose. That's real risk, not a toy
-stat, and shouldn't be something you stumble into via a cheat code. If
-it's exposed at all, it should require the same explicit, unmissable
-confirmation the CLI itself demands.
-
-**Not gamified: infinite mana.** Mana is tied to real spend, so it
-can't be cheated honestly. The right version of "play without real
-stakes" is a separate sandbox/demo mode running against fake budget
-entirely — for showing the game off — rather than a cheat applied to
-real agents.
-
-## 17. Enhancement plan
-
-Phases 1–4 are implemented. This is no longer a from-scratch build plan
-— it's the roadmap for what comes next, on top of a working tool.
-
-### Shipped
-
-- **Phase 1 — Core loop.** World + movement, summoning, NPC status/
-  health-as-context, player budget/hearts, core control actions
-  (talk/steer, interrupt, resume, dismiss).
-- **Phase 2 — Visibility depth.** The Mirror, Inventory with skills/
-  plugins and model-as-equipment, Quest log, Journal, permission
-  actions, multi-agent support with camp-clustering.
-- **Phase 3 — A living world.** Quest board and automated side quest
-  types, trophies and the rewind mechanic, subagent lifecycle, hooks/
-  Auto-Mode/plan-mode/background-task/memory-tome mappings.
-- **Phase 4 — Depth & delight.** Resume entry point, the Tavern, the
-  Scrying Pool, Easter eggs (§15 — kept exactly as designed, no
-  changes), cheat codes.
-- **Backfill — the parts of Phases 3 & 4 that were listed as shipped
-  but weren't.** An audit against the source found five gaps, since
-  closed:
-  - **Hooks → wards (§14).** The merged Claude Code settings cascade is
-    read through the SDK's `resolveSettings`; each configured hook
-    becomes a rune circle in the village, amber where it can block an
-    action and blue where it only watches. Any blocking hook also draws
-    the boundary ward-line — §14's invisible fence, made visible.
-  - **Rewind (§9c).** The agent that runs `git commit` owns the commit;
-    a later revert naming that sha rewinds that agent's trophy in place
-    rather than deleting it, so the work and its undoing both stay
-    visible.
-  - **Trophies (§9/§13).** A session that landed a commit or ran a long
-    haul of tool calls now raises a monument rather than a generic
-    chest, trophies are readable, and returning subagents leave scratch
-    marks (capped, per §13's batch-resolution rule). Trophies also no
-    longer stack invisibly on top of each other.
-  - **Side quest types (§9b).** The remaining six of nine: overgrown
-    ruins (code untouched for months), traveling merchant (`npm
-    outdated`), trickster (skipped/retried tests), escort (a
-    just-arrived contributor), raid boss (a party sharing one
-    objective, with a boss bar), and fishing (an idle dock that opens
-    only while a long background task runs, and closes when it ends).
-    The board now round-robins across kinds so one prolific scanner
-    can't take every slot.
-  - **Live-attach (§8a/§11 path 3)** remains open — see below.
-- **Enhancement A — Simplified interaction model (§7a).** Direct
-  click/tap on NPCs and objects, one consistent interact button
-  (Space/Enter), and persistent on-screen buttons for the global
-  overlays — including the Chronicle (§6a). Landed together with the
-  doc revisions it was built against: repo-as-village dropped (§12)
-  and summoning moved off the portal into the menu (§8).
-- **Enhancement B — Tutorials & onboarding (§18).** Guide NPC by the
-  fountain with a skippable, replayable tour built around the new
-  click-based interactions, first-time contextual signposts, and a
-  searchable full reference.
-
-- **Live-attach (§8a, §11 path 3), resolved as fork-on-attach.** The
-  SDK cannot take over input on a session another process owns, so
-  attaching to a ● live session forks it via `forkSession` into a twin
-  Agent Quest fully controls. The original keeps running; the world is
-  explicit about the distinction everywhere it matters (spawn toast,
-  a ⧉ nameplate mark, a banner in the talk dialog, and the twin's own
-  spawn prompt warning it that the original still writes to the same
-  directory). Verified end-to-end against a live session, including a
-  denied twin `git commit` caught by the permission gate.
-- **Phase 5 — World expansion & Map (§1a, §20).** The village square
-  is now the hub cell of a 3×3 world. The tavern, watchtower/scrying
-  pool, and pond/dock moved out to their own areas; the Ruins,
-  Frontier (merchant wagon), Arena (stone ring), and Shopping District
-  (shuttered stalls awaiting Phase 6) are new ground. Tree lines with
-  gapped crossings separate areas; discovery is walking somewhere for
-  the first time (persisted); the 🗺 Map shows discovered areas,
-  your position, live pins (board count, camp overflow, merchant,
-  raid, the dock during a long wait), and fast travel to anywhere
-  you've been. The §14 ward fence now rings the village cell — hooks
-  govern the village, not the wilderness.
-- **Phase 6 — Shops & marketplace (§5b).** The Shopping District's
-  three stalls opened as real marketplace browsers, each with its own
-  keeper: the Skill Apothecary (stocked live from `anthropics/skills`;
-  buying copies the skill folder into `.claude/skills/`), the Plugin
-  Smithy (the official `anthropics/claude-code` marketplace; buying
-  writes the documented `enabledPlugins` + `extraKnownMarketplaces`
-  keys into `.claude/settings.json`), and the Connector Emporium (the
-  MCP registry at registry.modelcontextprotocol.io; buying writes the
-  server into `.mcp.json`, remote or npx form). Selling back reverses
-  each. No mana — installing costs no tokens (§5b). Shelves restock
-  every 30 minutes, keep the last good stock when a registry is
-  unreachable, and a "just in" shelf plus a 🛍 Map pin surface items
-  this player hasn't seen on a previous visit.
-
-### Upcoming phases
-- **Phase 7 — Customization & extensibility (§19).** The in-app editor
-  surface, scoped/reversible changes, and the error boundary with
-  in-world crash recovery. Deliberately last: highest-risk phase
-  (arbitrary changes to a running tool), so it should land once
-  everything it could break — including the simplified interaction
-  model and the larger world — is itself stable.
 
 ## 10. Data model (conceptual)
 
@@ -767,6 +631,186 @@ loop:
   tome that persists between summons — opening it shows what it already
   knows about this project, distinct from the per-session journal (§6),
   which resets each time.
+
+## 15. Easter eggs
+
+Unlike the rest of this doc, these don't need airtight design rules —
+they're allowed to just be delightful and slightly arbitrary. A grab
+bag worth keeping in mind for later, not fully specced:
+
+- A dusty statue in a forgotten corner labeled with a deprecated model
+  name (Claude 1, Claude 2) — a little graveyard-of-versions joke, with
+  the currently-equipped model tier (§5a) glowing brightly by contrast.
+- An old man in a cave who hands you a cosmetic shield with a line like
+  "it's dangerous to `git push --force` alone — take this."
+- A skeleton in the overgrown-ruins tech-debt structure (§9b) wearing a
+  name tag that just says "TODO: fix later."
+- A rubber duck NPC by a pond that, if you talk to it, just repeats your
+  last steering instruction back to you — actual rubber-duck debugging,
+  staged as a joke.
+- Push on a wall in an empty corner of the village enough times and it
+  cracks open — classic secret-passage energy, reward is cosmetic only.
+- If an agent's journal (§6) logs an unusually long unbroken streak of
+  the same tool call, a small "are you okay?" bubble appears above it.
+- Summon (§8) way past any reasonable budget and get a dry, self-aware
+  line back rather than a plain error — "the mirror looks back at you,
+  unimpressed."
+
+## 16. Cheat codes
+
+Mostly for fun, same spirit as §15 — with one exception that needs to
+stay honest about what it actually does.
+
+**Cosmetic / dev-convenience:**
+- **Noclip** — fly over the village ignoring collision/walls, purely
+  cosmetic, just for getting around fast or admiring the map.
+- **Speed boost** — temporary faster movement, purely cosmetic.
+- **Level select** — jump straight to the Mirror (§4), or teleport
+  directly to any named agent, skipping the walk.
+- **Reveal map** — light up all Easter eggs (§15) and hidden
+  interactions at once, for anyone who wants to see everything without
+  hunting.
+- **Debug console** — a dev-console overlay that dumps raw telemetry
+  across every active NPC at once, bypassing the Mirror's one-at-a-time
+  browsing.
+
+**God mode = toggling Auto Mode, not disabling safety.**
+The cheat doesn't remove permission gates — it hands them to the
+classifier instead of you. Entering it flips the gatekeeper NPC (§14)
+from asking *you* before every risky tool call to acting on the safety
+classifier's own judgment, the same real Auto Mode feature already in
+the doc. Visually, the gatekeeper stops looking to you before deciding.
+You stop being the bottleneck, the agent moves faster and more
+autonomously, but the actual safety mechanism stays fully intact
+underneath — a real feature getting a fun unlock moment, not a toggle
+that quietly turns something important off.
+
+True `--dangerously-skip-permissions` — genuinely no gates at all —
+stays out of this list entirely on purpose. That's real risk, not a toy
+stat, and shouldn't be something you stumble into via a cheat code. If
+it's exposed at all, it should require the same explicit, unmissable
+confirmation the CLI itself demands.
+
+**Not gamified: infinite mana.** Mana is tied to real spend, so it
+can't be cheated honestly. The right version of "play without real
+stakes" is a separate sandbox/demo mode running against fake budget
+entirely — for showing the game off — rather than a cheat applied to
+real agents.
+
+## 17. Enhancement plan
+
+All seven phases are shipped. This section is the record of what landed
+(and how open questions resolved), plus what comes next on top of a
+working tool.
+
+### Shipped
+
+- **Phase 1 — Core loop.** World + movement, summoning, NPC status/
+  health-as-context, player budget/hearts, core control actions
+  (talk/steer, interrupt, resume, dismiss).
+- **Phase 2 — Visibility depth.** The Mirror, Inventory with skills/
+  plugins and model-as-equipment, Quest log, Journal, permission
+  actions, multi-agent support with camp-clustering.
+- **Phase 3 — A living world.** Quest board and automated side quest
+  types, trophies and the rewind mechanic, subagent lifecycle, hooks/
+  Auto-Mode/plan-mode/background-task/memory-tome mappings.
+- **Phase 4 — Depth & delight.** Resume entry point, the Tavern, the
+  Scrying Pool, Easter eggs (§15 — kept exactly as designed, no
+  changes), cheat codes.
+- **Backfill — the parts of Phases 3 & 4 that were listed as shipped
+  but weren't.** An audit against the source found five gaps, since
+  closed:
+  - **Hooks → wards (§14).** The merged Claude Code settings cascade is
+    read through the SDK's `resolveSettings`; each configured hook
+    becomes a rune circle in the village, amber where it can block an
+    action and blue where it only watches. Any blocking hook also draws
+    the boundary ward-line — §14's invisible fence, made visible.
+  - **Rewind (§9c).** The agent that runs `git commit` owns the commit;
+    a later revert naming that sha rewinds that agent's trophy in place
+    rather than deleting it, so the work and its undoing both stay
+    visible.
+  - **Trophies (§9/§13).** A session that landed a commit or ran a long
+    haul of tool calls now raises a monument rather than a generic
+    chest, trophies are readable, and returning subagents leave scratch
+    marks (capped, per §13's batch-resolution rule). Trophies also no
+    longer stack invisibly on top of each other.
+  - **Side quest types (§9b).** The remaining six of nine: overgrown
+    ruins (code untouched for months), traveling merchant (`npm
+    outdated`), trickster (skipped/retried tests), escort (a
+    just-arrived contributor), raid boss (a party sharing one
+    objective, with a boss bar), and fishing (an idle dock that opens
+    only while a long background task runs, and closes when it ends).
+    The board now round-robins across kinds so one prolific scanner
+    can't take every slot.
+  - **Live-attach (§8a/§11 path 3)** — resolved separately, see below.
+- **Enhancement A — Simplified interaction model (§7a).** Direct
+  click/tap on NPCs and objects, one consistent interact button
+  (Space/Enter), and persistent on-screen buttons for the global
+  overlays — including the Chronicle (§6a). Landed together with the
+  doc revisions it was built against: repo-as-village dropped (§12)
+  and summoning moved off the portal into the menu (§8).
+- **Enhancement B — Tutorials & onboarding (§18).** Guide NPC by the
+  fountain with a skippable, replayable tour built around the new
+  click-based interactions, first-time contextual signposts, and a
+  searchable full reference.
+- **Live-attach (§8a, §11 path 3), resolved as fork-on-attach.** The
+  SDK cannot take over input on a session another process owns, so
+  attaching to a ● live session forks it via `forkSession` into a twin
+  Agent Quest fully controls. The original keeps running; the world is
+  explicit about the distinction everywhere it matters (spawn toast,
+  a ⧉ nameplate mark, a banner in the talk dialog, and the twin's own
+  spawn prompt warning it that the original still writes to the same
+  directory). Verified end-to-end against a live session, including a
+  denied twin `git commit` caught by the permission gate.
+- **Phase 5 — World expansion & Map (§1a, §20).** The village square
+  is now the hub cell of a 3×3 world. The tavern, watchtower/scrying
+  pool, and pond/dock moved out to their own areas; the Ruins,
+  Frontier (merchant wagon), Arena (stone ring), and Shopping District
+  (shuttered stalls awaiting Phase 6) are new ground. Tree lines with
+  gapped crossings separate areas; discovery is walking somewhere for
+  the first time (persisted); the 🗺 Map shows discovered areas,
+  your position, live pins (board count, camp overflow, merchant,
+  raid, the dock during a long wait), and fast travel to anywhere
+  you've been. The §14 ward fence now rings the village cell — hooks
+  govern the village, not the wilderness.
+- **Phase 6 — Shops & marketplace (§5b).** The Shopping District's
+  three stalls opened as real marketplace browsers, each with its own
+  keeper: the Skill Apothecary (stocked live from `anthropics/skills`;
+  buying copies the skill folder into `.claude/skills/`), the Plugin
+  Smithy (the official `anthropics/claude-code` marketplace; buying
+  writes the documented `enabledPlugins` + `extraKnownMarketplaces`
+  keys into `.claude/settings.json`), and the Connector Emporium (the
+  MCP registry at registry.modelcontextprotocol.io; buying writes the
+  server into `.mcp.json`, remote or npx form). Selling back reverses
+  each. No mana — installing costs no tokens (§5b). Shelves restock
+  every 30 minutes, keep the last good stock when a registry is
+  unreachable, and a "just in" shelf plus a 🛍 Map pin surface items
+  this player hasn't seen on a previous visit.
+- **Phase 7 — Customization & extensibility (§19).** Customization
+  shipped as data, not code injection: the world's customizable
+  surfaces render from a validated, versioned overrides document, and
+  the World Codex (✎) edits it — cosmetic (ground palette, tunic,
+  renames for buildings and areas) through structural (walking pace,
+  heart count as the mana formula's visible half, ward colors and the
+  §14 fence, and player-posted board notices as a new side-quest
+  type). Preview renders a draft without persisting; Apply persists
+  and pushes the old version onto a revert stack; Revert pops it in
+  one click. Every value is clamped/sanitized so the world can always
+  render what the document says. Each customizable surface (world,
+  HUD, Map, quest board, the Codex itself) sits in its own rift
+  boundary: a crash tears an in-world rift over that surface alone —
+  "Seal the rift" reverts the last change, "Patch it" just remounts —
+  while agents keep running underneath (verified live: an agent kept
+  spending and later asked for a permission through a torn world).
+  The core control surfaces don't read overrides, so an edit cannot
+  break them; a root boundary is the last-resort net.
+
+### What's next
+
+The build plan is complete — what comes next is no longer scaffolding
+but evolution: §9b's remaining runtime encounters (trickster re-rolls,
+escort walk-alongs), richer Arena staging for raids, and whatever the
+World Codex's users ask for.
 
 ## 18. Tutorials & onboarding
 

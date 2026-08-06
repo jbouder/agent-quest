@@ -5,8 +5,7 @@
 Your repo is a village. Your agents are villagers. Walk up and talk to
 steer them, tap them to interrupt, and watch their context window drain
 like a health bar. Built with Phaser 3, React 19, and the Claude Agent
-SDK — see [DESIGN.md](./docs/DESIGN.md) for the full vision (all four
-implementation phases are built).
+SDK — see [DESIGN.md](./docs/DESIGN.md) for the full design.
 
 ![The village plaza](docs/screenshots/plaza.jpg)
 
@@ -70,86 +69,128 @@ Claude Code credentials).
 
 ## Features
 
-**Phase 1 — core loop**
-- Village + movement, summon-from-anywhere with model-as-equipment and
-  permission gate choice (§1, §8)
-- Real agents as NPCs via the Claude Agent SDK: status animations,
-  NPC health = context window, player hearts = shared budget (§2, §3)
-- Talk/steer, interrupt, resume, dismiss, allow/deny (§7)
+### Agents as villagers
 
-**Phase 2 — visibility depth**
-- The Mirror (`M`): live agent grid, attention pulse, tap to warp (§4)
-- Inventory: tools/skills/MCP items with used-this-session glow; model
-  as an equipment slot with real mid-session re-equip (§5, §5a)
-- Quest log from TaskCreate/TaskUpdate; the Chronicle (`J`) — every
-  agent's journal in one filterable feed (§6, §6a);
-  camp clustering past 6 NPCs with Mirror promotion (§12)
+- **Summon from anywhere.** The ✨ Scroll of Summoning takes a quest
+  description, a model (equipped like gear), and a permission gate
+  choice, and a new NPC walks into town.
+- **Full control while they work.** Walk up (or tap) to talk and steer
+  mid-task, interrupt, resume, or dismiss. Permission requests surface
+  as allow/deny prompts in the world.
+- **Status you can read at a glance.** NPC animations track what the
+  session is actually doing — thinking, running tools, waiting on you,
+  or done.
+- **Revive and fork.** Saved sessions can be revived from the summon
+  dialog. A ● live session offers "Attach (fork)": it forks into a twin
+  you fully control while the original keeps running elsewhere. The
+  twin is marked ⧉ everywhere so it's never mistaken for the original.
 
-**Phase 3 — a living world**
-- Quest board scanned from the repo; accepting prefills the summon
-  scroll (§9a, §9b)
-- Subagent minions, party badges, scroll-flash returns, campfires (§13, §14)
-- Plan mode = draft quest log; CLAUDE.md as a memory tome; Auto Mode
-  gatekeeper NPC (§14)
+### Two resources, two bars
 
-**Phase 4 — depth & delight**
-- Revive saved sessions from the summon dialog (§8a)
-- The Tavern: procedural bard, town crier reading recent commits,
-  library keyed to live activity, a garden (§9d)
-- The Scrying Pool: summons a real Haiku scout to web-search (§9e)
-- Easter eggs (§15) and the cheat console — god mode is real Auto Mode (§16)
+- **Context window = each NPC's health.** It drains as the session's
+  context fills; auto-compaction restores it.
+- **Your hearts = the shared token budget.** Every agent draws from the
+  same pool. At zero hearts, everyone falls asleep until you raise the
+  budget.
 
-**Enhancements A & B — interaction + onboarding**
-- Simplified interaction model: click/tap anything directly, one
-  consistent interact key (Space/Enter), persistent on-screen buttons
-  for all global overlays (§7a)
-- Guide NPC by the fountain with a replayable tour, first-time
-  contextual hints, and a searchable in-game reference (§18)
+### Subagents & parallel work
 
-**Backfill — the rest of Phases 3 & 4**
-- Hooks as wards on the world: rune circles per configured hook, read
-  from the settings cascade, plus a boundary ward-line wherever a hook
-  can actually block an action (§14)
-- Rewind: the agent that runs `git commit` owns the commit, and a later
-  revert rewinds that agent's trophy in place instead of erasing it (§9c)
-- Monuments for sessions that landed real work, readable trophies, and
-  scratch marks where subagents finished (§9, §13)
-- The last six §9b quest types: overgrown ruins, traveling merchant,
-  trickster, escort, raid boss (with a boss bar), and the fishing dock
-  that opens only while a long job runs
+- **Subagents are minions** that spawn beside their parent. Parallel
+  fan-outs get a party badge; background tasks burn as campfires until
+  they finish.
+- **Scroll-flash returns** when a subagent reports back, and scratch
+  marks stay behind where minions finished their work.
+- **Camp clustering** keeps the square readable past six NPCs —
+  overflow agents pitch camp, with promotion back to the square via the
+  Mirror.
 
-**Live-attach (resolved as fork-on-attach):** a ● live session in the
-summon dialog offers "Attach (fork)" — it forks into a twin you fully
-control (steer, interrupt, permissions) while the original keeps
-running elsewhere. The twin is marked ⧉ everywhere so it's never
-mistaken for the original.
+### Visibility & oversight
 
-**Phase 5 — world expansion & the Map**
-- The square is the hub of a 3×3 world: Ruins, Watchtower, Frontier,
-  Tavern, Arena, Docks, South Road, Shopping District (§1a). The
-  tavern, scrying pool, and fishing dock moved into their own areas
-- Discovery by walking: areas stay ??? on the Map until you first
-  enter them (persisted across sessions)
-- The 🗺 Map (§20): discovered areas, your position, live pins (board
-  quests, camp overflow, merchant stock, raids, the open dock), and
-  fast travel to any discovered area
+- **The Mirror (`M`)** — a live grid of every agent with an attention
+  pulse on whoever needs you; tap any tile to warp to that agent.
+- **The Chronicle (`J`)** — every agent's journal merged into one
+  filterable feed.
+- **Quest log** — each agent's task list, live from the SDK's task
+  tracking; plan mode shows up as a draft quest log you approve before
+  work starts.
+- **Inventory** — the tools, skills, and MCP servers an agent carries,
+  with a used-this-session glow. The model is an equipment slot with
+  real mid-session re-equip.
 
-**Phase 6 — shops & marketplace (§5b)**
-- The Shopping District's three stalls are real marketplace browsers:
-  the Skill Apothecary (anthropics/skills), the Plugin Smithy (the
-  official claude-code marketplace), and the Connector Emporium (the
-  MCP registry)
-- Buying is installing — skills → `.claude/skills/`, plugins →
-  `enabledPlugins` in `.claude/settings.json`, connectors →
-  `.mcp.json`. Selling back reverses each. No tokens spent either way
-- Shelves restock from the live registries; a "just in" shelf and a
-  🛍 Map pin surface stock you haven't seen before
+### A living world built from your repo
+
+- **The quest board** is scanned from the repo itself — stale branches,
+  TODO/FIXME bounties, README gaps. Accepting a quest prefills the
+  summon scroll.
+- **Side quests with mechanics of their own:** overgrown ruins, a
+  traveling merchant, a trickster, escorts, raid bosses with a boss
+  bar, and a fishing dock that only opens while a long job runs.
+- **Rewind:** the agent that runs `git commit` owns the commit; a later
+  revert rewinds that agent's trophy in place instead of erasing it.
+- **Monuments and trophies** commemorate sessions that landed real
+  work — walk up and read them.
+- **Hooks are wards.** Every configured hook (read from the settings
+  cascade) renders as a rune circle, with a boundary ward-line wherever
+  a hook can actually block an action.
+- **CLAUDE.md is a memory tome**, and Auto Mode is guarded by a
+  gatekeeper NPC.
+
+### A world to explore
+
+- **Nine areas in a 3×3 world** around the central square: Ruins,
+  Watchtower, Frontier, Tavern, Arena, Docks, South Road, and the
+  Shopping District.
+- **Discovery by walking.** Areas stay ??? on the Map until you first
+  enter them, persisted across sessions.
+- **The 🗺 Map** shows discovered areas, your position, and live pins —
+  board quests, camp overflow, merchant stock, raids, the open dock —
+  with fast travel to any discovered area.
+
+### Shops & marketplace
+
+The Shopping District's three stalls are real marketplace browsers:
+
+- **The Skill Apothecary** — anthropics/skills
+- **The Plugin Smithy** — the official claude-code marketplace
+- **The Connector Emporium** — the MCP registry
+
+Buying is installing: skills land in `.claude/skills/`, plugins in
+`enabledPlugins` in `.claude/settings.json`, connectors in `.mcp.json`.
+Selling back reverses each — no tokens spent either way. Shelves
+restock from the live registries, and a "just in" shelf plus a 🛍 Map
+pin surface stock you haven't seen before.
+
+### Downtime
+
+- **The Tavern** — a procedural bard, a town crier reading recent
+  commits, a library keyed to live activity, and a garden.
+- **The Scrying Pool** — summons a real Haiku scout to web-search while
+  you wait on longer work.
+
+### Customization & the World Codex
+
+- **Reshape the world from inside it** with the World Codex (✎):
+  ground palette, your tunic and pace, heart count, ward styling,
+  renames, and your own recurring board notices.
+- **Preview before apply**, and every apply is one-click revertible — a
+  real history stack, not an undo gesture.
+- **Rift boundaries:** a broken change tears an in-world rift over that
+  surface only, while agents keep running underneath. Sealing the rift
+  reverts the last change. Try it: `` ` `` then `rift world`.
+
+### Onboarding & extras
+
+- **A guide NPC by the fountain** runs a replayable tour, backed by
+  first-time contextual hints and a searchable in-game reference (❓).
+- **A cheat console** (`` ` ``): noclip, speed, warp, reveal — and god
+  mode, which is real Auto Mode.
+- **Easter eggs.** They're hidden. That's the point.
 
 ## Layout
 
 ```
 shared/protocol.ts   wire types: AgentSnapshot, ClientCommand, ServerEvent
-server/              Node/TS control layer — owns the live session handles (§11)
+server/              Node/TS control layer — owns the live session handles
   src/agentSession.ts  one SDK query() per NPC: streaming input, interrupt,
                        permission callback, telemetry derivation
   src/sessionManager.ts registry + budget + broadcast
