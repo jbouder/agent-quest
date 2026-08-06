@@ -134,6 +134,17 @@ mistaken for the original.
   quests, camp overflow, merchant stock, raids, the open dock), and
   fast travel to any discovered area
 
+**Phase 6 — shops & marketplace (§5b)**
+- The Shopping District's three stalls are real marketplace browsers:
+  the Skill Apothecary (anthropics/skills), the Plugin Smithy (the
+  official claude-code marketplace), and the Connector Emporium (the
+  MCP registry)
+- Buying is installing — skills → `.claude/skills/`, plugins →
+  `enabledPlugins` in `.claude/settings.json`, connectors →
+  `.mcp.json`. Selling back reverses each. No tokens spent either way
+- Shelves restock from the live registries; a "just in" shelf and a
+  🛍 Map pin surface stock you haven't seen before
+
 ## Layout
 
 ```

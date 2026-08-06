@@ -1,6 +1,11 @@
 import Phaser from "phaser";
 import { contextHealth, describeWard } from "@/lib/format";
-import type { AgentSnapshot, AgentStatus, Ward } from "@/lib/protocol";
+import type {
+  AgentSnapshot,
+  AgentStatus,
+  ShopKind,
+  Ward,
+} from "@/lib/protocol";
 import { hintOnce, localToast } from "@/lib/socket";
 import {
   agentsAtom,
@@ -95,7 +100,6 @@ const EGGS: { id: string; x: number; y: number }[] = [
   { id: "wall", ...sq(60, 260) },
   // §1a flavor for the new areas
   { id: "wagon", x: WAGON.x, y: WAGON.y },
-  { id: "stall", x: STALLS.x, y: STALLS.y },
 ];
 
 /**
@@ -178,6 +182,7 @@ const PROMPT_VERB: Record<Exclude<Interactable, null>["kind"], string> = {
   ward: "read",
   trophy: "read",
   dock: "fish",
+  shop: "browse",
 };
 
 const STATUS_ICON: Record<AgentStatus, string> = {
@@ -674,6 +679,9 @@ export class VillageScene extends Phaser.Scene {
           );
         }
         break;
+      case "shop":
+        gameStore.set(uiModeAtom, { mode: "shop", shop: target.shop });
+        break;
       case "npc":
         gameStore.set(uiModeAtom, { mode: "talk", agentId: target.agentId });
         break;
@@ -919,13 +927,29 @@ export class VillageScene extends Phaser.Scene {
         .setDepth(3);
     }
 
-    // The Shopping District (SE): stalls up, shutters down — Phase 6 (§5b).
-    for (const dx of [-90, 0, 90]) {
-      this.addShadow(STALLS.x + dx, STALLS.y + 22, 1.3);
+    // The Shopping District (SE): three specialty shops, open for business
+    // (§5b) — each stall has its keeper standing at the counter.
+    const shopStalls: { dx: number; shop: ShopKind; label: string }[] = [
+      { dx: -160, shop: "skills", label: "skill apothecary" },
+      { dx: 0, shop: "plugins", label: "plugin smithy" },
+      { dx: 160, shop: "mcp", label: "connector emporium" },
+    ];
+    for (const stall of shopStalls) {
+      const x = STALLS.x + stall.dx;
+      this.addShadow(x, STALLS.y + 22, 1.3);
+      this.clickable(this.add.image(x, STALLS.y, "stall").setDepth(4), {
+        kind: "shop",
+        shop: stall.shop,
+      });
+      this.addShadow(x, STALLS.y + 41, 0.55);
       this.clickable(
-        this.add.image(STALLS.x + dx, STALLS.y, "stall").setDepth(4),
-        { kind: "egg", eggId: "stall" },
+        this.add
+          .image(x, STALLS.y + 40, `keeper-${stall.shop}`)
+          .setOrigin(0.5, 1)
+          .setDepth(5),
+        { kind: "shop", shop: stall.shop },
       );
+      this.addLabel(x, STALLS.y + 52, stall.label);
     }
 
     // §20 — a signpost at every landing, naming where you've arrived.
@@ -1469,12 +1493,6 @@ export class VillageScene extends Phaser.Scene {
         );
         break;
       }
-      case "stall":
-        localToast(
-          "info",
-          "🏗 The stalls are shuttered. A sign reads: “Grand opening — Phase 6. Skills, plugins, connectors.”",
-        );
-        break;
       case "wall":
         if (this.wallOpened) {
           localToast("info", "The crack in the rock glitters faintly.");
@@ -1652,6 +1670,15 @@ export class VillageScene extends Phaser.Scene {
     if (gameStore.get(longWaitAtom)) {
       consider({ kind: "dock" }, this.dock.x, this.dock.y, 32);
     }
+    // §5b — the three shop counters
+    consider(
+      { kind: "shop", shop: "skills" },
+      STALLS.x - 160,
+      STALLS.y + 30,
+      64,
+    );
+    consider({ kind: "shop", shop: "plugins" }, STALLS.x, STALLS.y + 30, 64);
+    consider({ kind: "shop", shop: "mcp" }, STALLS.x + 160, STALLS.y + 30, 64);
     for (const [id, view] of this.npcs) {
       const agent = gameStore.get(agentsAtom).find((a) => a.id === id);
       if (!agent || agent.status === "ended") continue;

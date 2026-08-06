@@ -23,6 +23,7 @@ import {
   listDistricts,
   scanQuestBoard,
 } from "./repo";
+import { DemoShopManager, ShopManager, type Shops } from "./shops";
 import { readWards } from "./wards";
 
 // §8/§12: NPCs are cheap to look at, not to run — the village renders ~6
@@ -47,6 +48,8 @@ export class SessionManager {
   private wards: Ward[] = [];
   /** §9b — the current boss fight, kept across snapshots so its clock runs. */
   private raid: Raid | null = null;
+  /** §5b — the Shopping District's live shelves. */
+  private shops: Shops;
 
   constructor(
     private emit: (event: ServerEvent) => void,
@@ -56,6 +59,9 @@ export class SessionManager {
     this.budget = new BudgetTracker(budgetUsd);
     const repoRoot = findRepoRoot(process.cwd());
     this.world = { repoRoot, districts: listDistricts(repoRoot) };
+    this.shops = demoMode
+      ? new DemoShopManager()
+      : new ShopManager(repoRoot, () => this.scheduleBroadcast());
     void this.refreshBoard();
     setInterval(() => void this.refreshBoard(), BOARD_REFRESH_MS).unref();
     setInterval(() => void this.checkReverts(), REVERT_POLL_MS).unref();
@@ -123,6 +129,7 @@ export class SessionManager {
       recentCommits: this.recentCommits,
       wards: this.wards,
       raid: this.updateRaid(agents),
+      shops: this.shops.snapshot(),
       demoMode: this.demoMode,
     };
   }
@@ -175,6 +182,13 @@ export class SessionManager {
       case "equipModel":
         void this.sessions.get(command.agentId)?.equipModel(command.model);
         break;
+      // §5b — buying is installing; both are real config changes on the repo.
+      case "shopInstall":
+        void this.shopAction(command.kind, command.id, "install");
+        break;
+      case "shopRemove":
+        void this.shopAction(command.kind, command.id, "remove");
+        break;
       case "topUp": {
         this.budget.topUp(command.amountUsd);
         this.toast("info", `Budget topped up by $${command.amountUsd}.`);
@@ -183,6 +197,30 @@ export class SessionManager {
         break;
       }
     }
+  }
+
+  /** §5b — the purchase flourish is a toast; the effect is a config change. */
+  private async shopAction(
+    kind: "skills" | "plugins" | "mcp",
+    id: string,
+    action: "install" | "remove",
+  ): Promise<void> {
+    const name = this.shops.itemName(kind, id);
+    try {
+      if (action === "install") {
+        await this.shops.install(kind, id);
+        this.toast("info", `✨ ${name} wrapped and bagged — it's yours.`);
+      } else {
+        await this.shops.remove(kind, id);
+        this.toast(
+          "info",
+          `↩ ${name} sold back. The shopkeeper re-shelves it.`,
+        );
+      }
+    } catch (error) {
+      this.toast("error", `The shopkeeper frowns: ${String(error)}`);
+    }
+    this.scheduleBroadcast();
   }
 
   private async sendSessions(): Promise<void> {

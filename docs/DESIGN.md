@@ -602,13 +602,21 @@ Phases 1–4 are implemented. This is no longer a from-scratch build plan
   raid, the dock during a long wait), and fast travel to anywhere
   you've been. The §14 ward fence now rings the village cell — hooks
   govern the village, not the wilderness.
+- **Phase 6 — Shops & marketplace (§5b).** The Shopping District's
+  three stalls opened as real marketplace browsers, each with its own
+  keeper: the Skill Apothecary (stocked live from `anthropics/skills`;
+  buying copies the skill folder into `.claude/skills/`), the Plugin
+  Smithy (the official `anthropics/claude-code` marketplace; buying
+  writes the documented `enabledPlugins` + `extraKnownMarketplaces`
+  keys into `.claude/settings.json`), and the Connector Emporium (the
+  MCP registry at registry.modelcontextprotocol.io; buying writes the
+  server into `.mcp.json`, remote or npx form). Selling back reverses
+  each. No mana — installing costs no tokens (§5b). Shelves restock
+  every 30 minutes, keep the last good stock when a registry is
+  unreachable, and a "just in" shelf plus a 🛍 Map pin surface items
+  this player hasn't seen on a previous visit.
 
 ### Upcoming phases
-- **Phase 6 — Shops & marketplace (§5b).** Browsing and installing
-  skills, plugins, and MCP connectors from Anthropic's registry through
-  in-world shops, now with their own district (§1a). Additive on top
-  of a stable core — genuinely useful, not required for managing agents
-  already configured.
 - **Phase 7 — Customization & extensibility (§19).** The in-app editor
   surface, scoped/reversible changes, and the error boundary with
   in-world crash recovery. Deliberately last: highest-risk phase

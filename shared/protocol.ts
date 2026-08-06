@@ -104,6 +104,30 @@ export interface Ward {
   blocking: boolean;
 }
 
+/** §5b — the three specialty shops in the Shopping District. */
+export type ShopKind = "skills" | "plugins" | "mcp";
+
+/** §5b — one item on a shop shelf, pulled from a real registry. */
+export interface ShopItem {
+  /** Stable id within its shop (skill dir name, plugin name, server name). */
+  id: string;
+  kind: ShopKind;
+  name: string;
+  description: string;
+  /** One-line provenance: version, category, or vendor. */
+  detail: string;
+  /** Already in this repo's configuration (§5b: shown on the shelf). */
+  installed: boolean;
+}
+
+/** §5b — a shop's current shelf, plus how the last restock went. */
+export interface ShopStock {
+  items: ShopItem[];
+  fetchedTs: number;
+  /** Non-null when the last restock failed — the supply wagon is late. */
+  error: string | null;
+}
+
 /** §8a — a saved Claude Code session that can be resumed as an NPC. */
 export interface SessionSummary {
   sessionId: string;
@@ -212,6 +236,8 @@ export type ServerEvent =
       wards: Ward[];
       /** §9b — the party's shared boss fight, when one has formed. */
       raid: Raid | null;
+      /** §5b — the Shopping District's shelves. */
+      shops: Record<ShopKind, ShopStock>;
       /** True when the server runs on a fake budget with fake agents (§16). */
       demoMode: boolean;
     }
@@ -253,6 +279,10 @@ export type ClientCommand =
   | { type: "permission"; agentId: string; requestId: string; allow: boolean }
   // §5a — swap the model mid-session: a visible re-equip, not a silent change
   | { type: "equipModel"; agentId: string; model: string }
+  // §5b — buying is installing; selling back is uninstalling. Both are real
+  // config changes on the repo (skills dir, settings.json, .mcp.json).
+  | { type: "shopInstall"; kind: ShopKind; id: string }
+  | { type: "shopRemove"; kind: ShopKind; id: string }
   // dev convenience: raise the budget so sleeping agents can be woken
   | { type: "topUp"; amountUsd: number };
 

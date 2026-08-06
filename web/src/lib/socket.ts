@@ -11,6 +11,7 @@ import {
   raidAtom,
   recentCommitsAtom,
   savedSessionsAtom,
+  shopsAtom,
   sideQuestsAtom,
   toastsAtom,
   wardsAtom,
@@ -87,6 +88,7 @@ function handleEvent(event: ServerEvent): void {
       safeSet(() => gameStore.set(recentCommitsAtom, event.recentCommits));
       safeSet(() => gameStore.set(wardsAtom, event.wards));
       safeSet(() => gameStore.set(raidAtom, event.raid));
+      safeSet(() => gameStore.set(shopsAtom, event.shops));
       safeSet(() => gameStore.set(demoModeAtom, event.demoMode));
       safeSet(() => gameStore.set(agentsAtom, event.agents));
       // §18 — teach features the first time they actually matter.

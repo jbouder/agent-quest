@@ -99,7 +99,7 @@ export const AREAS: Area[] = [
     name: "Shopping District",
     cx: 2,
     cy: 2,
-    blurb: "stalls going up — the market arrives with Phase 6",
+    blurb: "the apothecary, the smithy, and the emporium",
   },
 ];
 

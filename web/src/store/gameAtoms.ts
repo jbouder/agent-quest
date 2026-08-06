@@ -6,6 +6,8 @@ import type {
   PlayerState,
   Raid,
   SessionSummary,
+  ShopKind,
+  ShopStock,
   SideQuest,
   Ward,
 } from "@/lib/protocol";
@@ -43,6 +45,13 @@ export const wardsAtom = atom<Ward[]>([]);
 
 /** §9b — the party's shared boss fight, when one has formed. */
 export const raidAtom = atom<Raid | null>(null);
+
+/** §5b — the Shopping District's shelves, restocked by the server. */
+export const shopsAtom = atom<Record<ShopKind, ShopStock>>({
+  skills: { items: [], fetchedTs: 0, error: null },
+  plugins: { items: [], fetchedTs: 0, error: null },
+  mcp: { items: [], fetchedTs: 0, error: null },
+});
 
 // §20 — the Map
 /** Areas you've physically walked to (persisted; the scene adds to it). */
@@ -136,6 +145,8 @@ export type UiMode =
   | { mode: "fishing" }
   // §20 — the Map: geography, discovery, and fast travel
   | { mode: "map" }
+  // §5b — one of the Shopping District's three specialty shops
+  | { mode: "shop"; shop: ShopKind }
   | { mode: "cheat" }
   // §18 — the guide's walkthrough and the searchable full reference
   | { mode: "tutorial" }
@@ -159,6 +170,8 @@ export type Interactable =
   | { kind: "trophy"; agentId: string }
   // §9b — the pond's dock, fishable while a long job runs
   | { kind: "dock" }
+  // §5b — a specialty shop's stall in the Shopping District
+  | { kind: "shop"; shop: ShopKind }
   | null;
 
 export const nearbyAtom = atom<Interactable>(null);

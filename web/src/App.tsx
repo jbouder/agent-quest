@@ -14,6 +14,7 @@ import MenuBar from "@/components/MenuBar";
 import Mirror from "@/components/Mirror";
 import QuestBoardDialog from "@/components/QuestBoardDialog";
 import ScryDialog from "@/components/ScryDialog";
+import ShopDialog from "@/components/ShopDialog";
 import SummonDialog from "@/components/SummonDialog";
 import TalkDialog from "@/components/TalkDialog";
 import TavernDialog from "@/components/TavernDialog";
@@ -52,6 +53,7 @@ export default function App() {
       <ScryDialog />
       <FishingDialog />
       <MapDialog />
+      <ShopDialog />
       <Mirror />
       <HelpDialog />
       <TutorialDialog />

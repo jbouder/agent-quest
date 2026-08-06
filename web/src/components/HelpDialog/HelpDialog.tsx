@@ -117,6 +117,12 @@ const ENTRIES: Entry[] = [
   },
   {
     section: "Places",
+    name: "Shopping District",
+    detail:
+      "Southeast. Three real marketplaces: the Skill Apothecary (anthropics/skills → .claude/skills), the Plugin Smithy (official marketplace → settings.json), and the Connector Emporium (MCP registry → .mcp.json). Buying installs; selling back uninstalls. New stock shows on the Map.",
+  },
+  {
+    section: "Places",
     name: "Camp",
     detail:
       "Past ~6 agents, newcomers cluster into the camp (tent + count). Visit it — or use the Mirror — to promote one to a full sprite.",

@@ -11,6 +11,7 @@ import {
 } from "@/game/areas";
 import { MAX_VILLAGE_NPCS } from "@/game/villagePlan";
 import type { AgentSnapshot, Raid, SideQuest } from "@/lib/protocol";
+import { loadSeen, unseenStockCount } from "@/lib/shopSeen";
 import { cn } from "@/lib/utils";
 import {
   agentsAtom,
@@ -20,6 +21,7 @@ import {
   playerAreaAtom,
   playerPosAtom,
   raidAtom,
+  shopsAtom,
   sideQuestsAtom,
   uiModeAtom,
 } from "@/store/gameAtoms";
@@ -39,8 +41,19 @@ export function pinsFor(state: {
   agents: AgentSnapshot[];
   raid: Raid | null;
   longWait: { agentLabel: string; description: string } | null;
+  /** §5b — how many shelf items this player hasn't seen yet. */
+  unseenStock?: number;
 }): MapPin[] {
   const pins: MapPin[] = [];
+
+  // §20 — shops with new stock get a pin on the district.
+  if (state.unseenStock && state.unseenStock > 0) {
+    pins.push({
+      area: "shopping",
+      icon: "🛍",
+      label: `${state.unseenStock} new item${state.unseenStock === 1 ? "" : "s"} in the shops`,
+    });
+  }
 
   // Everything posted on the board is a reason to visit the square…
   const posted = state.sideQuests.length;
@@ -106,6 +119,7 @@ export default function MapDialog() {
   const agents = useAtomValue(agentsAtom);
   const raid = useAtomValue(raidAtom);
   const longWait = useAtomValue(longWaitAtom);
+  const shops = useAtomValue(shopsAtom);
   const open = ui.mode === "map";
 
   useEffect(() => {
@@ -119,7 +133,13 @@ export default function MapDialog() {
 
   if (!open) return null;
 
-  const pins = pinsFor({ sideQuests, agents, raid, longWait });
+  const pins = pinsFor({
+    sideQuests,
+    agents,
+    raid,
+    longWait,
+    unseenStock: unseenStockCount(shops, loadSeen()),
+  });
   const travel = (id: AreaId) => {
     setTravel(id);
     setUi({ mode: "roam" });

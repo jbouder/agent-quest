@@ -585,6 +585,10 @@ export function generateTextures(scene: Phaser.Scene): void {
   character(scene, "oldman", 0x8a8a9a, 0xe8e3d0);
   character(scene, "gatekeeper", 0x8f2f2f, 0x2c2c34);
   character(scene, "guide", 0x2d8a80, 0xe8e3d0); // §18 tutorial guide
+  // §5b — one keeper per specialty shop
+  character(scene, "keeper-skills", 0x7a4f9e, 0xe8e3d0); // apothecary
+  character(scene, "keeper-plugins", 0x8f5b2f, 0x2c2c34); // smith
+  character(scene, "keeper-mcp", 0x2f6b8f, 0xd4a017); // far-places merchant
   for (const [tier, color] of Object.entries(TIER_COLORS)) {
     character(scene, `npc-${tier}`, color, 0x2c2c34);
   }
