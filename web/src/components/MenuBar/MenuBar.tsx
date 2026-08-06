@@ -38,6 +38,13 @@ export default function MenuBar() {
         setUi(ui.mode === "mirror" ? { mode: "roam" } : { mode: "mirror" }),
     },
     {
+      icon: "🗺",
+      label: "Map", // §20 — geography, discovery, fast travel
+      active: ui.mode === "map",
+      onClick: () =>
+        setUi(ui.mode === "map" ? { mode: "roam" } : { mode: "map" }),
+    },
+    {
       icon: "📜",
       label: "Chronicle (J)",
       active: chronicleOpen,

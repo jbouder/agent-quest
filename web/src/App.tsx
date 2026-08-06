@@ -9,6 +9,7 @@ import GameCanvas from "@/components/GameCanvas";
 import HelpDialog from "@/components/HelpDialog";
 import Hud from "@/components/Hud";
 import InventoryDialog from "@/components/InventoryDialog";
+import MapDialog from "@/components/MapDialog";
 import MenuBar from "@/components/MenuBar";
 import Mirror from "@/components/Mirror";
 import QuestBoardDialog from "@/components/QuestBoardDialog";
@@ -50,6 +51,7 @@ export default function App() {
       <TavernDialog />
       <ScryDialog />
       <FishingDialog />
+      <MapDialog />
       <Mirror />
       <HelpDialog />
       <TutorialDialog />

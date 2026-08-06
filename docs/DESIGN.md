@@ -582,24 +582,28 @@ Phases 1–4 are implemented. This is no longer a from-scratch build plan
   click-based interactions, first-time contextual signposts, and a
   searchable full reference.
 
-### Upcoming phases
+- **Live-attach (§8a, §11 path 3), resolved as fork-on-attach.** The
+  SDK cannot take over input on a session another process owns, so
+  attaching to a ● live session forks it via `forkSession` into a twin
+  Agent Quest fully controls. The original keeps running; the world is
+  explicit about the distinction everywhere it matters (spawn toast,
+  a ⧉ nameplate mark, a banner in the talk dialog, and the twin's own
+  spawn prompt warning it that the original still writes to the same
+  directory). Verified end-to-end against a live session, including a
+  denied twin `git commit` caught by the permission gate.
+- **Phase 5 — World expansion & Map (§1a, §20).** The village square
+  is now the hub cell of a 3×3 world. The tavern, watchtower/scrying
+  pool, and pond/dock moved out to their own areas; the Ruins,
+  Frontier (merchant wagon), Arena (stone ring), and Shopping District
+  (shuttered stalls awaiting Phase 6) are new ground. Tree lines with
+  gapped crossings separate areas; discovery is walking somewhere for
+  the first time (persisted); the 🗺 Map shows discovered areas,
+  your position, live pins (board count, camp overflow, merchant,
+  raid, the dock during a long wait), and fast travel to anywhere
+  you've been. The §14 ward fence now rings the village cell — hooks
+  govern the village, not the wilderness.
 
-- **Live-attach (§8a, §11 path 3).** Taking over input focus on a
-  session already running elsewhere has no support in the installed
-  `@anthropic-ai/claude-agent-sdk` — there is no attach export. The
-  near alternatives each give up something the design asks for:
-  `forkSession` yields a real control handle but leaves the original
-  running, and tailing `getSessionMessages` is observation only, which
-  §11 explicitly says is not enough to stop an agent. Blocked on
-  choosing which trade to make.
-- **Phase 5 — World expansion & Map (§1a, §20).** Grow beyond a single
-  village square into named areas (Shopping District, Tavern, Ruins,
-  Watchtower, Frontier, Arena, Docks), plus a dedicated Map screen for
-  discovery, fast travel, and live pins. Positioned before Shops/
-  Customization since those and other later features (a bigger shop
-  district, more elaborate customization surfaces) benefit from having
-  room to live in a larger world rather than being squeezed into one
-  screen.
+### Upcoming phases
 - **Phase 6 — Shops & marketplace (§5b).** Browsing and installing
   skills, plugins, and MCP connectors from Anthropic's registry through
   in-world shops, now with their own district (§1a). Additive on top

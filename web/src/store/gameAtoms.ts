@@ -1,4 +1,5 @@
 import { atom, createStore } from "jotai";
+import { type AreaId, loadDiscovered } from "@/game/areas";
 import type {
   AgentSnapshot,
   JournalLine,
@@ -42,6 +43,20 @@ export const wardsAtom = atom<Ward[]>([]);
 
 /** §9b — the party's shared boss fight, when one has formed. */
 export const raidAtom = atom<Raid | null>(null);
+
+// §20 — the Map
+/** Areas you've physically walked to (persisted; the scene adds to it). */
+export const discoveredAreasAtom = atom<Set<AreaId>>(
+  typeof localStorage !== "undefined"
+    ? loadDiscovered()
+    : new Set<AreaId>(["square"]),
+);
+/** The area the player is currently standing in. */
+export const playerAreaAtom = atom<AreaId>("square");
+/** Player world position, for the Map's you-are-here dot (throttled). */
+export const playerPosAtom = atom<{ x: number; y: number }>({ x: 0, y: 0 });
+/** §20 fast travel: set to an area id; the scene teleports and clears it. */
+export const mapTravelAtom = atom<AreaId | null>(null);
 
 /**
  * §9b fishing — a long-running background task means a long wait. Derived
@@ -119,6 +134,8 @@ export type UiMode =
   | { mode: "scry" }
   // §9b — the idle dock, open only while a long job is actually running
   | { mode: "fishing" }
+  // §20 — the Map: geography, discovery, and fast travel
+  | { mode: "map" }
   | { mode: "cheat" }
   // §18 — the guide's walkthrough and the searchable full reference
   | { mode: "tutorial" }
@@ -163,6 +180,11 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
       wardsAtom,
       raidAtom,
       longWaitAtom,
+      cheatWarpAtom,
+      mapTravelAtom,
+      discoveredAreasAtom,
+      playerAreaAtom,
+      playerPosAtom,
     },
     get: () => ({
       agents: gameStore.get(agentsAtom),

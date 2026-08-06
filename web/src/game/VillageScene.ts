@@ -1,24 +1,43 @@
 import Phaser from "phaser";
 import { contextHealth, describeWard } from "@/lib/format";
 import type { AgentSnapshot, AgentStatus, Ward } from "@/lib/protocol";
-import { localToast } from "@/lib/socket";
+import { hintOnce, localToast } from "@/lib/socket";
 import {
   agentsAtom,
   cheatWarpAtom,
   chronicleOpenAtom,
+  discoveredAreasAtom,
   gameStore,
   type Interactable,
   lastSteerAtom,
   longWaitAtom,
+  mapTravelAtom,
   nearbyAtom,
   noclipAtom,
+  playerAreaAtom,
+  playerPosAtom,
   revealMapAtom,
   shieldAtom,
+  sideQuestsAtom,
   speedBoostAtom,
   uiModeAtom,
   wardsAtom,
   warpTargetAtom,
 } from "@/store/gameAtoms";
+import {
+  AREAS,
+  areaAt,
+  areaById,
+  CELL_H,
+  CELL_W,
+  cellOrigin,
+  GRID,
+  inArea,
+  LANDINGS,
+  saveDiscovered,
+  WORLD_H,
+  WORLD_W,
+} from "./areas";
 import { generateTextures, modelTier } from "./textures";
 import {
   freeTrophySpot,
@@ -29,43 +48,54 @@ import {
   trophyKindFor,
 } from "./villagePlan";
 
-const WORLD_W = 1280;
-const WORLD_H = 960;
-const PLAZA = { x: 640, y: 430 };
+// §1a — the village square is now the hub cell of a 3×3 world. Everything it
+// used to own keeps its internal layout, shifted into the center cell; the
+// tavern, watchtower, and pond move out to their own areas.
+const SQ = cellOrigin("square");
+const sq = (x: number, y: number) => ({ x: SQ.x + x, y: SQ.y + y });
+
+const PLAZA = sq(640, 430);
 /** §8 — where summoned NPCs walk in from: the south road out of the village. */
-const ENTRANCE = { x: 640, y: 810 };
-const CAMP = { x: 985, y: 760 };
-const TAVERN = { x: 160, y: 640 };
-const TOWER = { x: 1150, y: 160 };
-const BOARD = { x: 810, y: 398 };
-const POND = { x: 200, y: 830 };
+const ENTRANCE = sq(640, 810);
+const CAMP = sq(985, 760);
+const BOARD = sq(810, 398);
 /** §18 — the guide waits by the fountain, right where you spawn. */
-const GUIDE = { x: 560, y: 540 };
+const GUIDE = sq(560, 540);
+// §1a — set apart in their own areas now
+const TAVERN = inArea("tavern", 620, 360);
+const TOWER = inArea("watchtower", 640, 380);
+const POND = inArea("docks", 560, 380);
+const WAGON = inArea("frontier", 640, 430);
+const ARENA = inArea("arena", 640, 460);
+const STALLS = inArea("shopping", 640, 420);
 const PLAYER_SPEED = 190;
 const INTERACT_RANGE = 64;
 
 /** Fixed idle spots for pinned agents, ringing the plaza (§12). */
 const SLOTS = [
-  { x: 500, y: 350 },
-  { x: 780, y: 350 },
-  { x: 480, y: 520 },
-  { x: 800, y: 520 },
-  { x: 570, y: 590 },
-  { x: 710, y: 590 },
+  sq(500, 350),
+  sq(780, 350),
+  sq(480, 520),
+  sq(800, 520),
+  sq(570, 590),
+  sq(710, 590),
 ];
 
 function slotFor(index: number): { x: number; y: number } {
   return SLOTS[index % SLOTS.length] ?? PLAZA;
 }
 
-/** §15 Easter eggs — placed around the village. */
+/** §15 Easter eggs — the village keeps its oddities; the duck follows the pond. */
 const EGGS: { id: string; x: number; y: number }[] = [
-  { id: "duck", x: POND.x + 40, y: POND.y - 10 },
-  { id: "statue1", x: 80, y: 120 },
-  { id: "statue2", x: 140, y: 120 },
-  { id: "oldman", x: 1215, y: 430 },
-  { id: "skeleton", x: 1070, y: 800 },
-  { id: "wall", x: 60, y: 260 },
+  { id: "duck", x: POND.x + 90, y: POND.y - 20 },
+  { id: "statue1", ...sq(80, 120) },
+  { id: "statue2", ...sq(140, 120) },
+  { id: "oldman", ...sq(1215, 430) },
+  { id: "skeleton", ...sq(1070, 800) },
+  { id: "wall", ...sq(60, 260) },
+  // §1a flavor for the new areas
+  { id: "wagon", x: WAGON.x, y: WAGON.y },
+  { id: "stall", x: STALLS.x, y: STALLS.y },
 ];
 
 /**
@@ -73,14 +103,14 @@ const EGGS: { id: string; x: number; y: number }[] = [
  * so a repo's wards always appear in the same places run to run.
  */
 const WARD_SPOTS = [
-  { x: 350, y: 250 },
-  { x: 930, y: 250 },
-  { x: 330, y: 700 },
-  { x: 900, y: 520 },
-  { x: 450, y: 810 },
-  { x: 1080, y: 560 },
-  { x: 250, y: 430 },
-  { x: 760, y: 800 },
+  sq(350, 250),
+  sq(930, 250),
+  sq(330, 700),
+  sq(900, 520),
+  sq(450, 810),
+  sq(1080, 560),
+  sq(250, 430),
+  sq(760, 800),
 ];
 
 /** Deterministic PRNG so the decoration layout is identical every load. */
@@ -95,28 +125,41 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Circles decorations must stay out of (structures and eggs). */
+/** Circles decorations must stay out of (structures, eggs, and landmarks). */
 const KEEPOUT: { x: number; y: number; r: number }[] = [
   { x: PLAZA.x, y: PLAZA.y, r: 210 },
   { x: ENTRANCE.x, y: ENTRANCE.y, r: 90 },
   { x: CAMP.x, y: CAMP.y, r: 90 },
-  { x: TAVERN.x, y: TAVERN.y, r: 120 },
-  { x: TOWER.x, y: TOWER.y, r: 120 },
-  { x: POND.x, y: POND.y, r: 100 },
+  { x: TAVERN.x, y: TAVERN.y, r: 130 },
+  { x: TOWER.x, y: TOWER.y, r: 130 },
+  { x: POND.x, y: POND.y, r: 190 },
   { x: GUIDE.x, y: GUIDE.y, r: 50 },
-  { x: 110, y: 110, r: 90 }, // statues
-  { x: 1215, y: 430, r: 60 }, // old man
-  { x: 1070, y: 800, r: 60 }, // skeleton
-  { x: 60, y: 260, r: 60 }, // cracked rock
-  { x: 688, y: 648, r: 50 }, // gatekeeper post
+  { ...sq(110, 110), r: 90 }, // statues
+  { ...sq(1215, 430), r: 60 }, // old man
+  { ...sq(1070, 800), r: 60 }, // skeleton
+  { ...sq(60, 260), r: 60 }, // cracked rock
+  { ...sq(688, 648), r: 50 }, // gatekeeper post
+  // §1a — the new areas' landmarks
+  { x: WAGON.x, y: WAGON.y, r: 110 },
+  { x: ARENA.x, y: ARENA.y, r: 280 },
+  { x: STALLS.x, y: STALLS.y, r: 170 },
+  { ...inArea("ruins", 640, 420), r: 250 },
+  // §20 — fast-travel landings and their signposts stay clear
+  ...AREAS.map((area) => ({ ...LANDINGS[area.id], r: 70 })),
   // §14 — keep scattered greenery out of the rune circles
   ...WARD_SPOTS.map((spot) => ({ ...spot, r: 46 })),
 ];
 
 function nearStructure(x: number, y: number): boolean {
-  // the plaza-to-south-road
-  if (Math.abs(x - PLAZA.x) < 60 && y > PLAZA.y - 20 && y < ENTRANCE.y + 20) {
+  // the south road: plaza, out of the village, down to the world's edge
+  if (Math.abs(x - PLAZA.x) < 60 && y > PLAZA.y - 20 && y < WORLD_H - 40) {
     return true;
+  }
+  // the cell-border tree lines and their crossing gaps
+  for (let line = 1; line < GRID; line++) {
+    if (Math.abs(x - line * CELL_W) < 40 || Math.abs(y - line * CELL_H) < 40) {
+      return true;
+    }
   }
   return KEEPOUT.some(
     (k) => Phaser.Math.Distance.Between(x, y, k.x, k.y) < k.r,
@@ -513,6 +556,9 @@ export class VillageScene extends Phaser.Scene {
   private wallOpened = false;
   private revealed = false;
   private noclipApplied = false;
+  // §20 — discovery + the Map's you-are-here dot
+  private lastArea: string | null = null;
+  private lastPosWrite = 0;
 
   constructor() {
     super("village");
@@ -673,19 +719,21 @@ export class VillageScene extends Phaser.Scene {
     this.add.tileSprite(0, 0, WORLD_W, WORLD_H, "grass").setOrigin(0);
 
     // break up the tiling with variant grass tiles on the same grid
-    for (let i = 0; i < 220; i++) {
+    for (let i = 0; i < 640; i++) {
       const tx = Math.floor(rng() * (WORLD_W / 32)) * 32;
       const ty = Math.floor(rng() * (WORLD_H / 32)) * 32;
       this.add.image(tx, ty, rng() < 0.5 ? "grass-1" : "grass-2").setOrigin(0);
     }
 
-    // paths get an ALttP-style darker packed-earth rim
+    // paths get an ALttP-style darker packed-earth rim; the south road now
+    // runs past the old entrance, through the road cell, to the world's edge
+    const roadEnd = WORLD_H - 60;
     const rim = this.add.graphics().setDepth(1);
     rim.fillStyle(0x7d5f33);
-    rim.fillRect(PLAZA.x - 38, PLAZA.y - 6, 76, ENTRANCE.y - PLAZA.y + 12);
+    rim.fillRect(PLAZA.x - 38, PLAZA.y - 6, 76, roadEnd - PLAZA.y + 12);
     rim.fillRect(PLAZA.x - 150, PLAZA.y - 118, 300, 236);
     this.add
-      .tileSprite(PLAZA.x, PLAZA.y, 64, ENTRANCE.y - PLAZA.y, "path")
+      .tileSprite(PLAZA.x, PLAZA.y, 64, roadEnd - PLAZA.y, "path")
       .setOrigin(0.5, 0)
       .setDepth(1);
     this.add
@@ -694,6 +742,7 @@ export class VillageScene extends Phaser.Scene {
       .setDepth(1);
 
     this.buildForestBorder(rng);
+    this.buildAreas();
     this.scatterDecorations(rng);
 
     this.addShadow(PLAZA.x, PLAZA.y + 20, 1.15);
@@ -739,51 +788,45 @@ export class VillageScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
 
-    // §15 — the delightful and slightly arbitrary
-    this.add.image(POND.x, POND.y, "pond").setDepth(2);
-    // §9b — the dock only matters while something long is running, so it
-    // stays quiet (and unlit) until there's actually a wait to fill.
-    this.dock = this.clickable(
-      this.add.image(POND.x - 6, POND.y + 4, "dock").setDepth(3),
-      { kind: "dock" },
+    // §15 — the delightful and slightly arbitrary (the pond and its duck now
+    // live at the Docks; the village keeps its statues, old man, and bones)
+    this.addSparkle(PLAZA.x - 6, PLAZA.y - 4);
+    const statue1 = sq(80, 120);
+    const statue2 = sq(140, 120);
+    this.addShadow(statue1.x, statue1.y + 10, 0.75);
+    this.addShadow(statue2.x, statue2.y + 10, 0.75);
+    this.clickable(
+      this.add.image(statue1.x, statue1.y - 12, "statue").setDepth(3),
+      { kind: "egg", eggId: "statue1" },
     );
     this.clickable(
-      this.add.image(POND.x + 40, POND.y - 10, "duck").setDepth(3),
-      { kind: "egg", eggId: "duck" },
+      this.add.image(statue2.x, statue2.y - 12, "statue").setDepth(3),
+      { kind: "egg", eggId: "statue2" },
     );
-    this.addSparkle(POND.x - 20, POND.y + 4);
-    this.addSparkle(POND.x + 14, POND.y - 12);
-    this.addSparkle(PLAZA.x - 6, PLAZA.y - 4);
-    this.addShadow(80, 130, 0.75);
-    this.addShadow(140, 130, 0.75);
-    this.clickable(this.add.image(80, 108, "statue").setDepth(3), {
-      kind: "egg",
-      eggId: "statue1",
-    });
-    this.clickable(this.add.image(140, 108, "statue").setDepth(3), {
-      kind: "egg",
-      eggId: "statue2",
-    });
-    this.addLabel(80, 132, "Claude 1");
-    this.addLabel(140, 132, "Claude 2");
-    this.addShadow(1215, 438, 0.55);
-    this.clickable(this.add.image(1215, 424, "oldman").setDepth(3), {
-      kind: "egg",
-      eggId: "oldman",
-    });
-    this.clickable(this.add.image(1070, 796, "bones").setDepth(3), {
+    this.addLabel(statue1.x, statue1.y + 12, "Claude 1");
+    this.addLabel(statue2.x, statue2.y + 12, "Claude 2");
+    const oldman = sq(1215, 430);
+    this.addShadow(oldman.x, oldman.y + 8, 0.55);
+    this.clickable(
+      this.add.image(oldman.x, oldman.y - 6, "oldman").setDepth(3),
+      { kind: "egg", eggId: "oldman" },
+    );
+    const bones = sq(1070, 800);
+    this.clickable(this.add.image(bones.x, bones.y - 4, "bones").setDepth(3), {
       kind: "egg",
       eggId: "skeleton",
     });
-    this.addShadow(60, 268, 0.7);
-    this.clickable(this.add.image(60, 254, "rock").setDepth(3), {
+    const rock = sq(60, 260);
+    this.addShadow(rock.x, rock.y + 8, 0.7);
+    this.clickable(this.add.image(rock.x, rock.y - 6, "rock").setDepth(3), {
       kind: "egg",
       eggId: "wall",
     });
 
     // §14 the gatekeeper — appears when the classifier holds the gates
+    const gate = sq(688, 648);
     this.gatekeeper = this.add
-      .image(688, 648, "gatekeeper")
+      .image(gate.x, gate.y, "gatekeeper")
       .setDepth(9)
       .setVisible(false);
 
@@ -806,6 +849,92 @@ export class VillageScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(5)
       .setVisible(false);
+  }
+
+  /** §1a — everything that lives outside the village square. */
+  private buildAreas(): void {
+    // The Docks (SW): the pond grows into a proper fishing spot.
+    this.add.image(POND.x, POND.y, "pond").setScale(2).setDepth(2);
+    this.dock = this.clickable(
+      this.add
+        .image(POND.x + 40, POND.y + 60, "dock")
+        .setScale(1.6)
+        .setDepth(3),
+      { kind: "dock" },
+    );
+    this.clickable(
+      this.add.image(POND.x + 90, POND.y - 20, "duck").setDepth(3),
+      { kind: "egg", eggId: "duck" },
+    );
+    this.addSparkle(POND.x - 40, POND.y + 8);
+    this.addSparkle(POND.x + 28, POND.y - 24);
+    this.addSparkle(POND.x + 64, POND.y + 30);
+
+    // The Ruins (NW): a collapsed keep, half-eaten by the green. §9b's
+    // tech-debt quests point here in spirit; the board still posts them.
+    const ruins = inArea("ruins", 640, 420);
+    for (const [dx, dy, flip] of [
+      [-140, -60, false],
+      [-10, -110, true],
+      [120, -50, false],
+      [-90, 60, true],
+      [90, 80, false],
+    ] as const) {
+      this.add
+        .image(ruins.x + dx, ruins.y + dy, "ruinwall")
+        .setFlipX(flip)
+        .setDepth(3);
+    }
+    this.addShadow(ruins.x - 30, ruins.y + 12, 0.75);
+    this.add
+      .image(ruins.x - 30, ruins.y - 10, "statue")
+      .setDepth(3)
+      .setAlpha(0.8);
+    this.add.image(ruins.x + 40, ruins.y + 20, "rock").setDepth(3);
+    this.add.image(ruins.x - 150, ruins.y + 90, "bush").setDepth(3);
+    this.add.image(ruins.x + 160, ruins.y + 40, "bush").setDepth(3);
+
+    // The Frontier (NE): the traveling merchant's wagon (§9b), open ground.
+    this.addShadow(WAGON.x, WAGON.y + 24, 1.6);
+    this.clickable(this.add.image(WAGON.x, WAGON.y, "wagon").setDepth(4), {
+      kind: "egg",
+      eggId: "wagon",
+    });
+    this.addLabel(WAGON.x, WAGON.y + 36, "traveling merchant");
+
+    // The Arena (E): a stone ring on packed earth, waiting for a raid (§9b).
+    this.add
+      .tileSprite(ARENA.x, ARENA.y, 420, 300, "path")
+      .setOrigin(0.5)
+      .setDepth(1);
+    const ringStones = 14;
+    for (let i = 0; i < ringStones; i++) {
+      const angle = (i / ringStones) * Math.PI * 2;
+      this.add
+        .image(
+          ARENA.x + Math.cos(angle) * 230,
+          ARENA.y + Math.sin(angle) * 165,
+          "rock",
+        )
+        .setDepth(3);
+    }
+
+    // The Shopping District (SE): stalls up, shutters down — Phase 6 (§5b).
+    for (const dx of [-90, 0, 90]) {
+      this.addShadow(STALLS.x + dx, STALLS.y + 22, 1.3);
+      this.clickable(
+        this.add.image(STALLS.x + dx, STALLS.y, "stall").setDepth(4),
+        { kind: "egg", eggId: "stall" },
+      );
+    }
+
+    // §20 — a signpost at every landing, naming where you've arrived.
+    for (const area of AREAS) {
+      if (area.id === "square") continue;
+      const landing = LANDINGS[area.id];
+      this.add.image(landing.x, landing.y - 8, "signpost").setDepth(4);
+      this.addLabel(landing.x, landing.y + 14, area.name.toLowerCase());
+    }
   }
 
   private addShadow(
@@ -833,10 +962,17 @@ export class VillageScene extends Phaser.Scene {
     });
   }
 
-  /** ALttP frames its maps: a tree line rings the whole world. */
+  /**
+   * ALttP frames its maps: a tree line rings the whole world, and thinner
+   * lines separate the areas (§1a) — with a gap in the middle of every shared
+   * edge, so each neighbor is reachable and discovery means walking there.
+   */
   private buildForestBorder(rng: () => number): void {
     const step = 46;
+    const GAP = 130;
     const jitter = () => (rng() - 0.5) * 14;
+
+    // outer ring
     for (let x = 20; x < WORLD_W; x += step) {
       this.add.image(x + jitter(), 18 + jitter(), "tree").setDepth(8);
       this.add.image(x + jitter(), WORLD_H - 14 + jitter(), "tree").setDepth(8);
@@ -844,6 +980,38 @@ export class VillageScene extends Phaser.Scene {
     for (let y = 60; y < WORLD_H - 40; y += step) {
       this.add.image(16 + jitter(), y + jitter(), "tree").setDepth(8);
       this.add.image(WORLD_W - 16 + jitter(), y + jitter(), "tree").setDepth(8);
+    }
+
+    // internal borders between cells, gapped at each shared edge's midpoint;
+    // the south road keeps its own gap where it crosses into the road cell
+    for (let line = 1; line < GRID; line++) {
+      const x = line * CELL_W;
+      for (let y = 40; y < WORLD_H - 20; y += step) {
+        const mid = (Math.floor(y / CELL_H) + 0.5) * CELL_H;
+        if (Math.abs(y - mid) < GAP) continue;
+        this.add.image(x + jitter(), y + jitter(), "tree").setDepth(8);
+      }
+      const yLine = line * CELL_H;
+      for (let x2 = 40; x2 < WORLD_W - 20; x2 += step) {
+        const mid = (Math.floor(x2 / CELL_W) + 0.5) * CELL_W;
+        if (Math.abs(x2 - mid) < GAP) continue;
+        if (Math.abs(x2 - PLAZA.x) < 90) continue; // the south/north road
+        this.add.image(x2 + jitter(), yLine + jitter(), "tree").setDepth(8);
+      }
+    }
+
+    // short path patches through the gaps, so exits read as exits
+    for (let line = 1; line < GRID; line++) {
+      for (let cell = 0; cell < GRID; cell++) {
+        this.add
+          .tileSprite(line * CELL_W, (cell + 0.5) * CELL_H, 96, 128, "path")
+          .setOrigin(0.5)
+          .setDepth(1);
+        this.add
+          .tileSprite((cell + 0.5) * CELL_W, line * CELL_H, 128, 96, "path")
+          .setOrigin(0.5)
+          .setDepth(1);
+      }
     }
   }
 
@@ -865,13 +1033,14 @@ export class VillageScene extends Phaser.Scene {
         placed += 1;
       }
     };
-    place(46, 70, (x, y) => this.add.image(x, y, "tuft").setDepth(2));
-    place(22, 70, (x, y) => this.add.image(x, y, "flower").setDepth(2));
-    place(14, 80, (x, y) => {
+    // ~6× the single-village counts, spread across the 3×3 world (§1a)
+    place(280, 70, (x, y) => this.add.image(x, y, "tuft").setDepth(2));
+    place(130, 70, (x, y) => this.add.image(x, y, "flower").setDepth(2));
+    place(80, 80, (x, y) => {
       this.addShadow(x, y + 9, 0.55);
       this.add.image(x, y, "bush").setDepth(3);
     });
-    place(7, 120, (x, y) => {
+    place(42, 120, (x, y) => {
       this.addShadow(x, y + 26, 0.95);
       this.add.image(x, y, "tree").setDepth(8);
     });
@@ -1002,25 +1171,31 @@ export class VillageScene extends Phaser.Scene {
     return circle;
   }
 
-  /** The §14 "invisible fence": posts and a faint line just inside the trees. */
+  /**
+   * The §14 "invisible fence": posts and a faint line at the *village*
+   * boundary — hooks govern the village, so the fence rings the hub cell,
+   * not the whole wider world.
+   */
   private buildWardFence(): Phaser.GameObjects.Container {
     const inset = 44;
-    const right = WORLD_W - inset;
-    const bottom = WORLD_H - inset;
+    const left = SQ.x + inset;
+    const top = SQ.y + inset;
+    const right = SQ.x + CELL_W - inset;
+    const bottom = SQ.y + CELL_H - inset;
     const parts: Phaser.GameObjects.GameObject[] = [];
 
     const line = this.add.graphics().setDepth(2);
     line.lineStyle(2, 0xd4a017, 0.28);
-    line.strokeRect(inset, inset, right - inset, bottom - inset);
+    line.strokeRect(left, top, right - left, bottom - top);
     parts.push(line);
 
     const step = 128;
-    for (let x = inset; x <= right; x += step) {
-      parts.push(this.add.image(x, inset, "ward-post").setDepth(7));
+    for (let x = left; x <= right; x += step) {
+      parts.push(this.add.image(x, top, "ward-post").setDepth(7));
       parts.push(this.add.image(x, bottom, "ward-post").setDepth(7));
     }
-    for (let y = inset + step; y < bottom; y += step) {
-      parts.push(this.add.image(inset, y, "ward-post").setDepth(7));
+    for (let y = top + step; y < bottom; y += step) {
+      parts.push(this.add.image(left, y, "ward-post").setDepth(7));
       parts.push(this.add.image(right, y, "ward-post").setDepth(7));
     }
 
@@ -1196,10 +1371,16 @@ export class VillageScene extends Phaser.Scene {
       plaza: PLAZA,
       entrance: ENTRANCE,
       camp: CAMP,
-      tavern: { x: TAVERN.x, y: TAVERN.y + 70 },
       pool: { x: TOWER.x, y: TOWER.y + 80 },
       board: { x: BOARD.x, y: BOARD.y + 40 },
-      pond: { x: POND.x + 60, y: POND.y },
+      pond: { x: POND.x + 60, y: POND.y + 120 },
+      // §20 — every named area, by id and by short name
+      ...Object.fromEntries(
+        AREAS.map((area) => [
+          area.id,
+          { x: LANDINGS[area.id].x, y: LANDINGS[area.id].y + 16 },
+        ]),
+      ),
     };
     const target = places[name];
     if (target) {
@@ -1275,6 +1456,25 @@ export class VillageScene extends Phaser.Scene {
           "💀 A skeleton in the weeds. Its name tag reads: “TODO: fix later”.",
         );
         break;
+      case "wagon": {
+        // §9b — the merchant nods toward the board when there's stock.
+        const stock = gameStore
+          .get(sideQuestsAtom)
+          .find((quest) => quest.kind === "merchant");
+        localToast(
+          "info",
+          stock
+            ? `🛒 “Fresh versions, straight off the cart!” — ${stock.title}. The paperwork's posted on the village board.`
+            : "🛒 “Nothing for you today,” the merchant shrugs. Your dependencies are current.",
+        );
+        break;
+      }
+      case "stall":
+        localToast(
+          "info",
+          "🏗 The stalls are shuttered. A sign reads: “Grand opening — Phase 6. Skills, plugins, connectors.”",
+        );
+        break;
       case "wall":
         if (this.wallOpened) {
           localToast("info", "The crack in the rock glitters faintly.");
@@ -1315,6 +1515,15 @@ export class VillageScene extends Phaser.Scene {
       gameStore.set(warpTargetAtom, null);
       this.handleWarp(warpTarget);
     }
+    // §20 fast travel — the Map picked a destination.
+    const travel = gameStore.get(mapTravelAtom);
+    if (travel) {
+      gameStore.set(mapTravelAtom, null);
+      const landing = LANDINGS[travel];
+      // Arrive just south of the signpost, clear of its label.
+      this.player.setPosition(landing.x, landing.y + 48);
+    }
+    this.trackArea();
     const cheatWarp = gameStore.get(cheatWarpAtom);
     if (cheatWarp) {
       gameStore.set(cheatWarpAtom, null);
@@ -1351,6 +1560,35 @@ export class VillageScene extends Phaser.Scene {
     this.updateInteraction(roaming);
     this.playerShadow.setPosition(this.player.x, this.player.y + 1);
     this.playerShadow.setAlpha(this.player.alpha);
+  }
+
+  /**
+   * §20 — discovery is walking somewhere: the first time the player enters
+   * an area it lights up on the Map, with a small toast to mark the moment.
+   */
+  private trackArea(): void {
+    const areaNow = areaAt(this.player.x, this.player.y);
+    if (areaNow !== this.lastArea) {
+      this.lastArea = areaNow;
+      gameStore.set(playerAreaAtom, areaNow);
+      const discovered = gameStore.get(discoveredAreasAtom);
+      if (!discovered.has(areaNow)) {
+        const next = new Set(discovered).add(areaNow);
+        gameStore.set(discoveredAreasAtom, next);
+        saveDiscovered(next);
+        const area = areaById(areaNow);
+        localToast("info", `✦ Discovered: ${area.name} — ${area.blurb}`);
+        hintOnce(
+          "map-discovery",
+          "🗺 Discovered places appear on your Map — open it to fast travel back.",
+        );
+      }
+    }
+    // Throttled you-are-here dot for the Map (§20).
+    if (this.time.now - this.lastPosWrite > 250) {
+      this.lastPosWrite = this.time.now;
+      gameStore.set(playerPosAtom, { x: this.player.x, y: this.player.y });
+    }
   }
 
   private updateMovement(roaming: boolean): void {

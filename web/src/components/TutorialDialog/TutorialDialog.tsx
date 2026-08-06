@@ -12,11 +12,11 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Getting around",
-    body: "Move with WASD or the arrow keys. The camera follows you around the village.",
+    body: "Move with WASD or the arrow keys. The camera follows you. The square is the hub of a wider world — walk out through the tree-line gaps to discover new areas, then fast travel back via the 🗺 Map.",
   },
   {
     title: "Interacting",
-    body: "Click or tap anything — an agent, the quest board, the tavern — from wherever you stand. Or walk up close: a small prompt appears when you're in range, and Space or Enter does the rest.",
+    body: "Click or tap anything you can see — an agent, the quest board, a signpost. Or walk up close: a small prompt appears when you're in range, and Space or Enter does the rest.",
   },
   {
     title: "Summoning an agent",

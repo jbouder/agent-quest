@@ -118,12 +118,21 @@ Claude Code credentials).
   trickster, escort, raid boss (with a boss bar), and the fishing dock
   that opens only while a long job runs
 
-**Known gap (an honest one):** live attach to a session running in
-another terminal (Remote Control) has no public API — the installed
-agent SDK has no attach export. `forkSession` would give a real control
-handle but leaves the original running, and tailing session messages is
-observation only, which §11 says is not enough to stop an agent. Noted
-in DESIGN.md, waiting on a decision about which trade to make.
+**Live-attach (resolved as fork-on-attach):** a ● live session in the
+summon dialog offers "Attach (fork)" — it forks into a twin you fully
+control (steer, interrupt, permissions) while the original keeps
+running elsewhere. The twin is marked ⧉ everywhere so it's never
+mistaken for the original.
+
+**Phase 5 — world expansion & the Map**
+- The square is the hub of a 3×3 world: Ruins, Watchtower, Frontier,
+  Tavern, Arena, Docks, South Road, Shopping District (§1a). The
+  tavern, scrying pool, and fishing dock moved into their own areas
+- Discovery by walking: areas stay ??? on the Map until you first
+  enter them (persisted across sessions)
+- The 🗺 Map (§20): discovered areas, your position, live pins (board
+  quests, camp overflow, merchant stock, raids, the open dock), and
+  fast travel to any discovered area
 
 ## Layout
 

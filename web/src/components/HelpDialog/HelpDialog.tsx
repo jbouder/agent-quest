@@ -87,14 +87,33 @@ const ENTRIES: Entry[] = [
   },
   {
     section: "Places",
+    name: "The wider world",
+    detail:
+      "The square is the hub of a 3×3 world: Ruins, Watchtower, Frontier, Tavern, Arena, Docks, and the Shopping District. Areas reveal themselves when you first walk there.",
+  },
+  {
+    section: "Places",
+    name: "The Map",
+    detail:
+      "The 🗺 button. Shows discovered areas, your position, and live pins (board quests, camps, raids, the dock). Click a discovered area to fast travel.",
+  },
+  {
+    section: "Places",
     name: "Tavern",
     detail:
-      "Player-chosen downtime: town crier (recent commits) and more. Nothing in here demands attention.",
+      "Its own area west of the square. Player-chosen downtime: town crier (recent commits) and more. Nothing in here demands attention.",
   },
   {
     section: "Places",
     name: "Scrying pool",
-    detail: "The watchtower pool — ad hoc lookups while you wait.",
+    detail:
+      "At the Watchtower, north of the square — ad hoc lookups while you wait.",
+  },
+  {
+    section: "Places",
+    name: "The Docks",
+    detail:
+      "Southwest. The dock lights up while a long background task runs — an idle line to cast that ends when the work does.",
   },
   {
     section: "Places",

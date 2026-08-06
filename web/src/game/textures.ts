@@ -462,6 +462,89 @@ export function generateTextures(scene: Phaser.Scene): void {
   g2.generateTexture("bones", 24, 22);
   g2.clear();
 
+  // §1a — a signpost naming each area, planted at its landing spot
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(10, 2, 6, 30);
+  g2.fillRect(1, 4, 24, 10);
+  g2.fillStyle(WOOD.dark);
+  g2.fillRect(11, 3, 4, 28);
+  g2.fillStyle(WOOD.base);
+  g2.fillRect(2, 5, 22, 8);
+  g2.fillStyle(WOOD.light);
+  g2.fillRect(2, 5, 22, 2);
+  g2.generateTexture("signpost", 26, 32);
+  g2.clear();
+
+  // §1a Shopping District — a market stall, shuttered until Phase 6
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(0, 14, 56, 26);
+  g2.fillStyle(WOOD.base);
+  g2.fillRect(1, 15, 54, 24);
+  g2.fillStyle(WOOD.dark);
+  g2.fillRect(1, 33, 54, 6);
+  g2.fillStyle(OUTLINE);
+  g2.fillTriangle(-2, 18, 28, -2, 58, 18);
+  // striped awning
+  g2.fillStyle(0xc74a4a);
+  g2.fillTriangle(0, 16, 28, 0, 56, 16);
+  g2.fillStyle(0xe8e3d0);
+  g2.fillTriangle(14, 8, 28, 0, 42, 8);
+  g2.fillStyle(WOOD.dark);
+  g2.fillRect(6, 20, 44, 10); // shuttered counter
+  g2.fillStyle(WOOD.light);
+  g2.fillRect(6, 20, 44, 2);
+  g2.generateTexture("stall", 56, 40);
+  g2.clear();
+
+  // §1a/§9b Frontier — the traveling merchant's covered wagon
+  g2.fillStyle(OUTLINE);
+  g2.fillEllipse(30, 16, 52, 30);
+  g2.fillStyle(0xd8cba8);
+  g2.fillEllipse(30, 16, 48, 26);
+  g2.fillStyle(0xbfb090);
+  g2.fillEllipse(30, 12, 40, 14);
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(2, 26, 56, 8);
+  g2.fillStyle(WOOD.base);
+  g2.fillRect(3, 27, 54, 6);
+  // wheels
+  g2.fillStyle(OUTLINE);
+  g2.fillCircle(14, 36, 8);
+  g2.fillCircle(46, 36, 8);
+  g2.fillStyle(WOOD.dark);
+  g2.fillCircle(14, 36, 6);
+  g2.fillCircle(46, 36, 6);
+  g2.fillStyle(WOOD.light);
+  g2.fillCircle(14, 36, 2);
+  g2.fillCircle(46, 36, 2);
+  g2.generateTexture("wagon", 60, 46);
+  g2.clear();
+
+  // §1a Ruins — a crumbled wall segment, vines creeping over it
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(0, 8, 64, 22);
+  g2.fillRect(6, 2, 14, 8);
+  g2.fillRect(40, 4, 12, 6);
+  g2.fillStyle(STONE.base);
+  g2.fillRect(1, 9, 62, 20);
+  g2.fillRect(7, 3, 12, 8);
+  g2.fillRect(41, 5, 10, 6);
+  g2.fillStyle(STONE.dark);
+  g2.fillRect(1, 24, 62, 5);
+  g2.fillRect(20, 9, 2, 15); // cracks
+  g2.fillRect(44, 12, 2, 12);
+  g2.fillStyle(STONE.light);
+  g2.fillRect(7, 3, 12, 2);
+  g2.fillRect(1, 9, 30, 2);
+  // vines
+  g2.fillStyle(0x2f7a3f);
+  g2.fillRect(10, 6, 3, 20);
+  g2.fillRect(13, 14, 4, 3);
+  g2.fillRect(50, 8, 3, 16);
+  g2.fillRect(47, 18, 4, 3);
+  g2.generateTexture("ruinwall", 64, 30);
+  g2.clear();
+
   // §14 wards — a hook is a rune circle etched into the ground. Watching
   // wards glow cool blue; blocking wards burn amber, the color of a gate.
   for (const [key, color] of [
