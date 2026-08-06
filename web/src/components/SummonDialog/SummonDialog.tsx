@@ -68,6 +68,19 @@ export default function SummonDialog() {
     });
     close();
   };
+  // §8a/§11 — a live session can't be taken over, so we fork it and drive the
+  // branch. The original keeps going; the prompt tells the twin as much.
+  const attach = (sessionId: string, sessionCwd: string | null) => {
+    sendCommand({
+      type: "summon",
+      task: "You are a fork of a session still running elsewhere in Agent Quest. Briefly summarize what that session was doing, then await instructions. Be careful: the original is still working in this directory, so check the current state of any file before changing it.",
+      cwd: sessionCwd ?? cwd,
+      model,
+      permissionMode,
+      attach: sessionId,
+    });
+    close();
+  };
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70">
@@ -94,9 +107,15 @@ export default function SummonDialog() {
                 : "text-muted hover:text-foreground",
             )}
           >
-            Revive a past session
+            Revive or attach
           </button>
         </div>
+        {tab === "resume" && (
+          <p className="mb-2 text-[10px] text-muted">
+            A ● live session is still being driven elsewhere. Attaching forks it
+            into a twin you control — the original keeps running.
+          </p>
+        )}
 
         {tab === "new" ? (
           <>
@@ -133,18 +152,41 @@ export default function SummonDialog() {
               </p>
             )}
             {sessions.map((session) => (
-              <button
+              <div
                 key={session.sessionId}
-                type="button"
-                onClick={() => revive(session.sessionId, session.cwd)}
-                className="block w-full border-b border-border p-2 text-left last:border-0 hover:bg-card"
+                className="flex items-center gap-2 border-b border-border p-2 last:border-0"
               >
-                <p className="truncate text-xs">{session.summary}</p>
-                <p className="truncate text-[10px] text-muted">
-                  {new Date(session.lastModified).toLocaleString()} ·{" "}
-                  {session.cwd ?? "unknown realm"}
-                </p>
-              </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs">
+                    {session.live && (
+                      <span className="mr-1 text-accent">● live</span>
+                    )}
+                    {session.summary}
+                  </p>
+                  <p className="truncate text-[10px] text-muted">
+                    {new Date(session.lastModified).toLocaleString()} ·{" "}
+                    {session.cwd ?? "unknown realm"}
+                  </p>
+                </div>
+                {/* §8a — a live session gets forked, not revived: reviving one
+                    would put two writers on the same transcript. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    session.live
+                      ? attach(session.sessionId, session.cwd)
+                      : revive(session.sessionId, session.cwd)
+                  }
+                  title={
+                    session.live
+                      ? "Fork this running session into a twin you control. The original keeps running."
+                      : "Revive this finished session."
+                  }
+                  className="shrink-0 rounded bg-primary px-2 py-1 text-[10px] text-primary-foreground hover:opacity-90"
+                >
+                  {session.live ? "Attach (fork)" : "Revive"}
+                </button>
+              </div>
             ))}
           </div>
         )}

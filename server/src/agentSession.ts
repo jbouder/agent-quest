@@ -19,7 +19,7 @@ import {
   type ToolUseStat,
 } from "../../shared/protocol";
 import { MonotonicCounter } from "./budget";
-import { districtOf, readTome } from "./repo";
+import { districtOf, headSha, readTome } from "./repo";
 
 export interface SessionEvents {
   /** Snapshot state changed — schedule a broadcast. */
@@ -38,6 +38,8 @@ export interface SpawnSpec {
   permissionMode: PermissionMode;
   /** §8a — resume a saved session instead of starting fresh. */
   resume?: string;
+  /** §8a — the live session this was forked from, if it was an attach. */
+  forkedFrom?: string;
 }
 
 /** World context shared by all sessions: the repo the server watches. */
@@ -96,6 +98,40 @@ class InputQueue implements AsyncIterable<SDKUserMessage> {
       },
     };
   }
+}
+
+/**
+ * §9c — does this Bash command create a commit? Deliberately strict: `git
+ * log`, `git show`, and anything merely mentioning the word shouldn't count,
+ * and `--dry-run` doesn't write history.
+ */
+/** Global git flags that consume the token after them. */
+const GIT_FLAGS_WITH_VALUE = new Set([
+  "-C",
+  "-c",
+  "--git-dir",
+  "--work-tree",
+  "--namespace",
+  "--exec-path",
+]);
+
+export function isGitCommit(command: unknown): boolean {
+  if (typeof command !== "string") return false;
+  if (/--dry-run\b/.test(command)) return false;
+
+  // Each shell segment is its own command, so `git add … && git commit` counts.
+  for (const segment of command.split(/[;&|]+/)) {
+    const tokens = segment.trim().split(/\s+/);
+    if (tokens[0] !== "git") continue;
+    let i = 1;
+    while (i < tokens.length) {
+      const token = tokens[i];
+      if (!token?.startsWith("-")) break;
+      i += GIT_FLAGS_WITH_VALUE.has(token) ? 2 : 1;
+    }
+    if (tokens[i] === "commit") return true;
+  }
+  return false;
 }
 
 function truncate(text: string, max = 90): string {
@@ -236,6 +272,13 @@ export class AgentSession {
   private tomePreview: string | null;
   private tasks = new Map<string, AgentTask>();
   private streak = { tool: "", count: 0 };
+  // §9c — commits this agent authored, and whether they've since been undone
+  private commits: string[] = [];
+  private rewound = false;
+  /** §8a — set when this NPC is a fork of a session running elsewhere. */
+  private forkedFrom: string | null;
+  /** tool_use ids of in-flight `git commit` calls, awaiting their result. */
+  private committing = new Set<string>();
 
   private queue = new InputQueue();
   private q: Query | null = null;
@@ -259,6 +302,7 @@ export class AgentSession {
     this.permissionMode = spec.permissionMode;
     this.planPending = spec.permissionMode === "plan";
     this.tomePreview = readTome(spec.cwd);
+    this.forkedFrom = spec.forkedFrom ?? null;
 
     this.q = query({
       prompt: this.queue,
@@ -306,7 +350,30 @@ export class AgentSession {
       planPending: this.planPending,
       tomePreview: this.tomePreview,
       tasks: [...this.tasks.values()],
+      commits: this.commits,
+      rewound: this.rewound,
+      forkedFrom: this.forkedFrom,
     };
+  }
+
+  /**
+   * §9c — after a `git commit` returns, whatever HEAD now points at is this
+   * agent's. Reading HEAD rather than parsing the command's output keeps it
+   * working for amends, squashes, and commits made through a wrapper script.
+   */
+  private async recordCommit(): Promise<void> {
+    const sha = await headSha(this.cwd);
+    if (!sha || this.commits.includes(sha)) return;
+    this.commits.push(sha);
+    this.events.onChange();
+  }
+
+  /** §9c — a later commit undid this agent's work. Fires once. */
+  markRewound(): void {
+    if (this.rewound) return;
+    this.rewound = true;
+    this.events.onJournal("status", "⟲ this work was reverted");
+    this.events.onChange();
   }
 
   get ended(): boolean {
@@ -517,6 +584,7 @@ export class AgentSession {
             description: truncate(message.description, 80),
             kind,
             status: "running",
+            startedTs: Date.now(),
           });
           this.events.onJournal(
             "status",
@@ -539,8 +607,13 @@ export class AgentSession {
           }
         } else if (message.subtype === "background_tasks_changed") {
           // REPLACE semantics: this payload is the full set of live campfires.
+          // This list replaces the running background set wholesale, so keep
+          // each task's original start time — §9b's idle timer depends on how
+          // long the wait has *actually* been, not on when we last resynced.
+          const startedAt = new Map<string, number>();
           for (const [id, task] of this.tasks) {
             if (task.kind === "background" && task.status === "running") {
+              startedAt.set(id, task.startedTs);
               this.tasks.delete(id);
             }
           }
@@ -550,6 +623,7 @@ export class AgentSession {
               description: truncate(live.description, 80),
               kind: "background",
               status: "running",
+              startedTs: startedAt.get(live.task_id) ?? Date.now(),
             });
           }
           this.events.onChange();
@@ -628,6 +702,12 @@ export class AgentSession {
             } else {
               this.streak = { tool: block.name, count: 1 };
             }
+            // §9c — the agent that runs `git commit` owns the commit, which
+            // is the only attribution that stays right with several agents
+            // working the same repo.
+            if (block.name === "Bash" && isGitCommit(input.command)) {
+              this.committing.add(block.id);
+            }
             this.outstandingTools.set(
               block.id,
               summarizeToolInput(block.name, input),
@@ -660,6 +740,7 @@ export class AgentSession {
               const id = String(block.tool_use_id);
               const name = this.outstandingTools.get(id);
               this.outstandingTools.delete(id);
+              if (this.committing.delete(id)) void this.recordCommit();
               if (name) this.events.onJournal("tool_result", `✓ ${name}`);
               if (this.outstandingTools.size === 0 && !this.sleeping) {
                 this.setStatus("thinking", "pondering the result…");

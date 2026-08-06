@@ -26,6 +26,9 @@ function agentWith(inventory: AgentSnapshot["inventory"]): AgentSnapshot {
     planPending: false,
     tomePreview: null,
     tasks: [],
+    commits: [],
+    rewound: false,
+    forkedFrom: null,
   };
 }
 

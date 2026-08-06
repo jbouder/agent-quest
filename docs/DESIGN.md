@@ -542,9 +542,35 @@ Phases 1–4 are implemented. This is no longer a from-scratch build plan
 - **Phase 3 — A living world.** Quest board and automated side quest
   types, trophies and the rewind mechanic, subagent lifecycle, hooks/
   Auto-Mode/plan-mode/background-task/memory-tome mappings.
-- **Phase 4 — Depth & delight.** Resume/live-attach entry points, the
-  Tavern, the Scrying Pool, Easter eggs (§15 — kept exactly as
-  designed, no changes), cheat codes.
+- **Phase 4 — Depth & delight.** Resume entry point, the Tavern, the
+  Scrying Pool, Easter eggs (§15 — kept exactly as designed, no
+  changes), cheat codes.
+- **Backfill — the parts of Phases 3 & 4 that were listed as shipped
+  but weren't.** An audit against the source found five gaps, since
+  closed:
+  - **Hooks → wards (§14).** The merged Claude Code settings cascade is
+    read through the SDK's `resolveSettings`; each configured hook
+    becomes a rune circle in the village, amber where it can block an
+    action and blue where it only watches. Any blocking hook also draws
+    the boundary ward-line — §14's invisible fence, made visible.
+  - **Rewind (§9c).** The agent that runs `git commit` owns the commit;
+    a later revert naming that sha rewinds that agent's trophy in place
+    rather than deleting it, so the work and its undoing both stay
+    visible.
+  - **Trophies (§9/§13).** A session that landed a commit or ran a long
+    haul of tool calls now raises a monument rather than a generic
+    chest, trophies are readable, and returning subagents leave scratch
+    marks (capped, per §13's batch-resolution rule). Trophies also no
+    longer stack invisibly on top of each other.
+  - **Side quest types (§9b).** The remaining six of nine: overgrown
+    ruins (code untouched for months), traveling merchant (`npm
+    outdated`), trickster (skipped/retried tests), escort (a
+    just-arrived contributor), raid boss (a party sharing one
+    objective, with a boss bar), and fishing (an idle dock that opens
+    only while a long background task runs, and closes when it ends).
+    The board now round-robins across kinds so one prolific scanner
+    can't take every slot.
+  - **Live-attach (§8a/§11 path 3)** remains open — see below.
 - **Enhancement A — Simplified interaction model (§7a).** Direct
   click/tap on NPCs and objects, one consistent interact button
   (Space/Enter), and persistent on-screen buttons for the global
@@ -558,6 +584,14 @@ Phases 1–4 are implemented. This is no longer a from-scratch build plan
 
 ### Upcoming phases
 
+- **Live-attach (§8a, §11 path 3).** Taking over input focus on a
+  session already running elsewhere has no support in the installed
+  `@anthropic-ai/claude-agent-sdk` — there is no attach export. The
+  near alternatives each give up something the design asks for:
+  `forkSession` yields a real control handle but leaves the original
+  running, and tailing `getSessionMessages` is observation only, which
+  §11 explicitly says is not enough to stop an agent. Blocked on
+  choosing which trade to make.
 - **Phase 5 — World expansion & Map (§1a, §20).** Grow beyond a single
   village square into named areas (Shopping District, Tavern, Ruins,
   Watchtower, Frontier, Arena, Docks), plus a dedicated Map screen for

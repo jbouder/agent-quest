@@ -226,6 +226,39 @@ export function generateTextures(scene: Phaser.Scene): void {
   g.fillRect(8, 6, 4, 5);
   g.fillRect(1, 7, 18, 1);
   g.generateTexture("chest", 20, 16);
+  g.clear();
+
+  // §9 monument — what a session that actually landed something leaves
+  // behind. Deliberately unlike the §15 easter-egg statues: a plinth, an
+  // obelisk, and a gold plaque you can read.
+  g.fillStyle(OUTLINE);
+  g.fillRect(1, 26, 22, 10);
+  g.fillStyle(STONE.base);
+  g.fillRect(2, 27, 20, 8);
+  g.fillStyle(STONE.light);
+  g.fillRect(2, 27, 20, 3);
+  g.fillStyle(OUTLINE);
+  g.fillRect(6, 2, 12, 25);
+  g.fillTriangle(5, 4, 12, -3, 19, 4);
+  g.fillStyle(0x8a93a8);
+  g.fillRect(7, 3, 10, 24);
+  g.fillTriangle(6, 4, 12, -1, 18, 4);
+  g.fillStyle(STONE.light);
+  g.fillRect(7, 3, 4, 24);
+  g.fillStyle(0xd4a017);
+  g.fillRect(8, 14, 8, 5);
+  g.fillStyle(0xa87c10);
+  g.fillRect(8, 18, 8, 1);
+  g.generateTexture("monument", 24, 37);
+  g.clear();
+
+  // §13 — the scratch a returning subagent leaves where it worked
+  g.fillStyle(0x6b5a3a, 0.85);
+  g.fillRect(1, 3, 7, 2);
+  g.fillRect(4, 6, 6, 2);
+  g.fillStyle(0x4e4128, 0.85);
+  g.fillRect(2, 5, 4, 1);
+  g.generateTexture("scratch", 12, 10);
   g.destroy();
 
   const g2 = scene.add.graphics();
@@ -363,6 +396,26 @@ export function generateTextures(scene: Phaser.Scene): void {
   g2.generateTexture("duck", 26, 18);
   g2.clear();
 
+  // §9b the dock — a short jetty out over the pond, planks and two posts
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(0, 3, 34, 13);
+  g2.fillStyle(WOOD.base);
+  g2.fillRect(1, 4, 32, 11);
+  g2.fillStyle(WOOD.light);
+  for (let plank = 2; plank < 33; plank += 6) {
+    g2.fillRect(plank, 5, 4, 9);
+  }
+  g2.fillStyle(WOOD.dark);
+  g2.fillRect(1, 13, 32, 2);
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(3, 0, 4, 6);
+  g2.fillRect(27, 0, 4, 6);
+  g2.fillStyle(WOOD.dark);
+  g2.fillRect(4, 1, 2, 5);
+  g2.fillRect(28, 1, 2, 5);
+  g2.generateTexture("dock", 34, 16);
+  g2.clear();
+
   // water sparkle for animated shimmer
   g2.fillStyle(0xd8ecff);
   g2.fillRect(0, 2, 6, 2);
@@ -407,6 +460,41 @@ export function generateTextures(scene: Phaser.Scene): void {
   g2.fillStyle(0xb8b3a0);
   g2.fillRect(4, 14, 16, 1);
   g2.generateTexture("bones", 24, 22);
+  g2.clear();
+
+  // §14 wards — a hook is a rune circle etched into the ground. Watching
+  // wards glow cool blue; blocking wards burn amber, the color of a gate.
+  for (const [key, color] of [
+    ["rune-watch", 0x6fb6d6],
+    ["rune-guard", 0xd4a017],
+  ] as const) {
+    g2.lineStyle(2, color, 0.9);
+    g2.strokeEllipse(26, 16, 46, 26);
+    g2.lineStyle(1, color, 0.5);
+    g2.strokeEllipse(26, 16, 34, 18);
+    g2.fillStyle(color, 0.85);
+    // four glyph ticks at the cardinal points of the ring
+    g2.fillRect(25, 1, 2, 5);
+    g2.fillRect(25, 26, 2, 5);
+    g2.fillRect(1, 15, 5, 2);
+    g2.fillRect(46, 15, 5, 2);
+    g2.generateTexture(key, 52, 32);
+    g2.clear();
+  }
+
+  // §14 — a boundary ward post, for the fence blocking hooks draw around
+  // the village. Stone stake, carved band, lit tip.
+  g2.fillStyle(OUTLINE);
+  g2.fillRect(2, 4, 10, 26);
+  g2.fillStyle(STONE.base);
+  g2.fillRect(3, 5, 8, 24);
+  g2.fillStyle(STONE.light);
+  g2.fillRect(3, 5, 3, 24);
+  g2.fillStyle(0xd4a017);
+  g2.fillRect(3, 12, 8, 3);
+  g2.fillStyle(0xf2e0a0);
+  g2.fillCircle(7, 3, 3);
+  g2.generateTexture("ward-post", 14, 32);
   g2.destroy();
 
   // player + one NPC skin per model tier, plus villagers

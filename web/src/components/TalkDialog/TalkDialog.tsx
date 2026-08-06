@@ -91,6 +91,15 @@ export default function TalkDialog() {
           <span className="text-muted">· spent {formatUsd(agent.costUsd)}</span>
         </div>
 
+        {/* §8a — steering a fork must never read as steering the original. */}
+        {agent.forkedFrom && (
+          <p className="mb-2 rounded border border-primary bg-background p-2 text-[10px] text-muted">
+            ⧉ A twin, forked from session {agent.forkedFrom.slice(0, 8)}, which
+            is still running elsewhere. Anything you do here affects this branch
+            only — it will not stop the original.
+          </p>
+        )}
+
         {agent.quests.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto rounded border border-border bg-background p-2 text-xs">
             <p className="mb-1 text-muted">

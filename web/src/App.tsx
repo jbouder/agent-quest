@@ -1,8 +1,10 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
+import BossBar from "@/components/BossBar";
 import CheatConsole from "@/components/CheatConsole";
 import Chronicle from "@/components/Chronicle";
 import DebugOverlay from "@/components/DebugOverlay";
+import FishingDialog from "@/components/FishingDialog";
 import GameCanvas from "@/components/GameCanvas";
 import HelpDialog from "@/components/HelpDialog";
 import Hud from "@/components/Hud";
@@ -33,6 +35,7 @@ export default function App() {
     <div className="relative h-full w-full">
       <GameCanvas />
       <Hud />
+      <BossBar />
       <MenuBar />
       {ui.mode === "roam" && nearby === null && (
         <p className="pointer-events-none absolute bottom-3 left-3 text-xs text-muted">
@@ -46,6 +49,7 @@ export default function App() {
       <QuestBoardDialog />
       <TavernDialog />
       <ScryDialog />
+      <FishingDialog />
       <Mirror />
       <HelpDialog />
       <TutorialDialog />

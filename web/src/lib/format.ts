@@ -1,3 +1,5 @@
+import type { Ward } from "@/lib/protocol";
+
 export function formatUsd(value: number): string {
   return `$${value.toFixed(value < 10 ? 2 : 1)}`;
 }
@@ -21,6 +23,18 @@ export function heartsFor(spentUsd: number, budgetUsd: number): number[] {
     const fill = remaining * HEART_COUNT - i;
     return Math.min(1, Math.max(0, fill));
   });
+}
+
+/**
+ * §14 — read a ward aloud. Guarding wards can stop an action; watching wards
+ * only observe one, and the wording has to make that difference obvious.
+ */
+export function describeWard(ward: Ward): string {
+  const scope = ward.matcher ? ` on ${ward.matcher}` : "";
+  const commands = ward.commands.join("; ");
+  return ward.blocking
+    ? `⭘ A guarding ward, set in ${ward.scope} settings. Nothing passes ${ward.event}${scope} without ${commands}.`
+    : `⭘ A watching ward, set in ${ward.scope} settings. It marks every ${ward.event}${scope} and runs ${commands}.`;
 }
 
 /** NPC health (§2): context window headroom, 0..1. */

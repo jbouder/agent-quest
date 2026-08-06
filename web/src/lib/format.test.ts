@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { contextHealth, formatTokens, HEART_COUNT, heartsFor } from "./format";
+import type { Ward } from "@/lib/protocol";
+import {
+  contextHealth,
+  describeWard,
+  formatTokens,
+  HEART_COUNT,
+  heartsFor,
+} from "./format";
 
 describe("heartsFor", () => {
   it("is all full hearts with nothing spent", () => {
@@ -30,6 +37,45 @@ describe("contextHealth", () => {
     expect(contextHealth(0, 200_000)).toBe(1);
     expect(contextHealth(150_000, 200_000)).toBeCloseTo(0.25);
     expect(contextHealth(250_000, 200_000)).toBe(0);
+  });
+});
+
+describe("describeWard", () => {
+  const ward = (over: Partial<Ward>): Ward => ({
+    id: "w",
+    event: "PreToolUse",
+    matcher: null,
+    commands: ["./gate.sh"],
+    scope: "project",
+    blocking: true,
+    ...over,
+  });
+
+  it("says a guarding ward stops things, naming the tier that set it", () => {
+    const text = describeWard(ward({ matcher: "Bash" }));
+    expect(text).toContain("guarding ward");
+    expect(text).toContain("project settings");
+    expect(text).toContain("PreToolUse on Bash");
+    expect(text).toContain("./gate.sh");
+  });
+
+  it("says a watching ward only observes", () => {
+    const text = describeWard(
+      ward({ event: "PostToolUse", blocking: false, scope: "user" }),
+    );
+    expect(text).toContain("watching ward");
+    expect(text).not.toContain("Nothing passes");
+  });
+
+  it("omits the tool clause when the ward matches everything", () => {
+    expect(describeWard(ward({ matcher: null }))).toContain(
+      "PreToolUse without",
+    );
+  });
+
+  it("lists every command a ward runs", () => {
+    const text = describeWard(ward({ commands: ["a.sh", "b.sh"] }));
+    expect(text).toContain("a.sh; b.sh");
   });
 });
 

@@ -31,6 +31,9 @@ export class FakeAgentSession {
   private costUsd = 0;
   private quests: Quest[] = [];
   private tasks = new Map<string, AgentTask>();
+  // §9c — demo mode never touches git, so these stay empty unless faked
+  private commits: string[] = [];
+  private rewound = false;
   private district: string | null = null;
   private permissionMode: PermissionMode;
   private pendingPermission: AgentSnapshot["pendingPermission"] = null;
@@ -96,7 +99,18 @@ export class FakeAgentSession {
       planPending: false,
       tomePreview: null,
       tasks: [...this.tasks.values()],
+      commits: this.commits,
+      rewound: this.rewound,
+      forkedFrom: null,
     };
+  }
+
+  /** §9c — demo agents fake a commit so the rewind is demonstrable (§16). */
+  markRewound(): void {
+    if (this.rewound) return;
+    this.rewound = true;
+    this.events.onJournal("status", "⟲ this work was reverted");
+    this.events.onChange();
   }
 
   steer(text: string): void {
@@ -242,6 +256,7 @@ export class FakeAgentSession {
         description: `scout ${this.pick(this.world.districts) ?? "the wilds"}`,
         kind: this.taskSeq % 3 === 0 ? "background" : "subagent",
         status: "running",
+        startedTs: Date.now(),
       });
       this.events.onJournal("status", "⚔ subagent sets out (demo)");
     } else {

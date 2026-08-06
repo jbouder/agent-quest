@@ -49,17 +49,59 @@ export interface AgentTask {
   description: string;
   kind: "subagent" | "background";
   status: "running" | "completed" | "failed" | "stopped";
+  /** §9b — when it set out, so a long wait can offer you something to do. */
+  startedTs: number;
+}
+
+/**
+ * §9b raid boss — several agents converging on one objective, which is a boss
+ * fight rather than a handful of unrelated side quests. Gets a shared boss bar
+ * instead of blending into ordinary village life.
+ */
+export interface Raid {
+  /** The working directory the party has formed around. */
+  cwd: string;
+  agentIds: string[];
+  /** Combined quest-log progress across the party, 0..1. */
+  progress: number;
+  startedTs: number;
 }
 
 /** §9a/§9b — a side quest posted on the village board, scanned from the repo. */
 export interface SideQuest {
   id: string;
-  kind: "weeds" | "bounty" | "docs";
+  kind:
+    | "weeds" // stale branches blocking a road
+    | "bounty" // TODO/FIXME findings
+    | "docs" // a villager confused about an undocumented directory
+    | "ruins" // overgrown tech debt: code nobody has touched in months
+    | "merchant" // a traveling merchant with dependency updates
+    | "trickster" // flaky or quarantined tests
+    | "escort"; // a new contributor who needs guiding through the village
   icon: string;
   title: string;
   detail: string;
   /** Prefills the summon dialog when the quest is accepted. */
   suggestedTask: string;
+}
+
+/**
+ * §14 — a configured hook, mapped to a ward on the world. Hooks are
+ * deterministic rules that hold regardless of what any agent wants, so they
+ * belong to the village itself, not to any one NPC's inventory (§5).
+ */
+export interface Ward {
+  id: string;
+  /** The hook event, e.g. "PreToolUse" / "Stop". */
+  event: string;
+  /** Tool pattern the hook is scoped to, if any. */
+  matcher: string | null;
+  /** The shell commands it runs. */
+  commands: string[];
+  /** Which settings tier placed it: user, project, local, managed… */
+  scope: string;
+  /** True for events whose hooks can actually block an action. */
+  blocking: boolean;
 }
 
 /** §8a — a saved Claude Code session that can be resumed as an NPC. */
@@ -68,7 +110,16 @@ export interface SessionSummary {
   summary: string;
   lastModified: number;
   cwd: string | null;
+  /**
+   * §8a — written to very recently, so something is probably still driving
+   * it. Reviving one of these would fight the other writer; forking gives us
+   * our own branch instead (§11).
+   */
+  live: boolean;
 }
+
+/** A session touched within this window counts as still running. */
+export const LIVE_SESSION_WINDOW_MS = 2 * 60_000;
 
 export interface AgentSnapshot {
   id: string;
@@ -106,6 +157,19 @@ export interface AgentSnapshot {
   tomePreview: string | null;
   /** §13/§14 — live subagents and backgrounded tasks. */
   tasks: AgentTask[];
+  /** §9c — commits this agent authored, oldest first. */
+  commits: string[];
+  /**
+   * §9c — a later commit reverted this agent's work. The trophy stays; it
+   * just plays a rewind and reads as undone, because that's what a revert
+   * actually is: a new commit, not an erasure of history.
+   */
+  rewound: boolean;
+  /**
+   * §8a — the session this one was forked from, when it was attached to a
+   * live session rather than started fresh. A doppelgänger, not the original.
+   */
+  forkedFrom: string | null;
 }
 
 export interface PlayerState {
@@ -144,6 +208,10 @@ export type ServerEvent =
       sideQuests: SideQuest[];
       /** §9d town crier — recent commits, read aloud in the tavern. */
       recentCommits: string[];
+      /** §14 — hooks configured for this repo, as wards on the world. */
+      wards: Ward[];
+      /** §9b — the party's shared boss fight, when one has formed. */
+      raid: Raid | null;
       /** True when the server runs on a fake budget with fake agents (§16). */
       demoMode: boolean;
     }
@@ -160,6 +228,14 @@ export type ClientCommand =
       model?: string;
       permissionMode?: PermissionMode;
       resume?: string;
+      /**
+       * §8a/§11 path 3 — attach to a session running elsewhere. The SDK has
+       * no way to take over another process's input, so we fork instead:
+       * Agent Quest gets a real control handle on its own branch, and the
+       * original keeps running untouched. The NPC is a twin, not the same
+       * character, and the world says so.
+       */
+      attach?: string;
     }
   // §8a — ask for the list of saved sessions that can be resumed
   | { type: "listSessions" }

@@ -1,5 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { parseQuests, QuestTracker, summarizeToolInput } from "./agentSession";
+import {
+  isGitCommit,
+  parseQuests,
+  QuestTracker,
+  summarizeToolInput,
+} from "./agentSession";
+
+describe("isGitCommit", () => {
+  it("recognizes a commit, including with flags and in a chain", () => {
+    expect(isGitCommit("git commit -m 'x'")).toBe(true);
+    expect(isGitCommit("git commit --amend --no-edit")).toBe(true);
+    expect(isGitCommit("git -C /repo commit -m x")).toBe(true);
+    expect(isGitCommit("git add -A && git commit -m x")).toBe(true);
+    expect(isGitCommit("git commit")).toBe(true);
+  });
+
+  it("ignores commands that only read or mention history", () => {
+    expect(isGitCommit("git log --oneline")).toBe(false);
+    expect(isGitCommit("git show HEAD")).toBe(false);
+    expect(isGitCommit("echo 'remember to git commit'")).toBe(false);
+    expect(isGitCommit("git commit-tree abc")).toBe(false);
+  });
+
+  it("ignores a dry run, which writes no history", () => {
+    expect(isGitCommit("git commit --dry-run")).toBe(false);
+  });
+
+  it("is false for a non-string input", () => {
+    expect(isGitCommit(undefined)).toBe(false);
+    expect(isGitCommit(42)).toBe(false);
+  });
+});
 
 describe("parseQuests", () => {
   it("maps a TodoWrite payload to quest entries", () => {

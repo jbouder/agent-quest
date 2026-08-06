@@ -1,6 +1,6 @@
 import Phaser from "phaser";
-import { contextHealth } from "@/lib/format";
-import type { AgentSnapshot, AgentStatus } from "@/lib/protocol";
+import { contextHealth, describeWard } from "@/lib/format";
+import type { AgentSnapshot, AgentStatus, Ward } from "@/lib/protocol";
 import { localToast } from "@/lib/socket";
 import {
   agentsAtom,
@@ -9,16 +9,25 @@ import {
   gameStore,
   type Interactable,
   lastSteerAtom,
+  longWaitAtom,
   nearbyAtom,
   noclipAtom,
   revealMapAtom,
   shieldAtom,
   speedBoostAtom,
   uiModeAtom,
+  wardsAtom,
   warpTargetAtom,
 } from "@/store/gameAtoms";
 import { generateTextures, modelTier } from "./textures";
-import { MAX_VILLAGE_NPCS, pickEviction, SlotAllocator } from "./villagePlan";
+import {
+  freeTrophySpot,
+  MAX_SUBAGENT_MARKS,
+  MAX_VILLAGE_NPCS,
+  pickEviction,
+  SlotAllocator,
+  trophyKindFor,
+} from "./villagePlan";
 
 const WORLD_W = 1280;
 const WORLD_H = 960;
@@ -59,6 +68,21 @@ const EGGS: { id: string; x: number; y: number }[] = [
   { id: "wall", x: 60, y: 260 },
 ];
 
+/**
+ * §14 — where rune circles land. Fixed open-grass spots ringing the village,
+ * so a repo's wards always appear in the same places run to run.
+ */
+const WARD_SPOTS = [
+  { x: 350, y: 250 },
+  { x: 930, y: 250 },
+  { x: 330, y: 700 },
+  { x: 900, y: 520 },
+  { x: 450, y: 810 },
+  { x: 1080, y: 560 },
+  { x: 250, y: 430 },
+  { x: 760, y: 800 },
+];
+
 /** Deterministic PRNG so the decoration layout is identical every load. */
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -85,6 +109,8 @@ const KEEPOUT: { x: number; y: number; r: number }[] = [
   { x: 1070, y: 800, r: 60 }, // skeleton
   { x: 60, y: 260, r: 60 }, // cracked rock
   { x: 688, y: 648, r: 50 }, // gatekeeper post
+  // §14 — keep scattered greenery out of the rune circles
+  ...WARD_SPOTS.map((spot) => ({ ...spot, r: 46 })),
 ];
 
 function nearStructure(x: number, y: number): boolean {
@@ -106,6 +132,9 @@ const PROMPT_VERB: Record<Exclude<Interactable, null>["kind"], string> = {
   scry: "gaze",
   egg: "look",
   guide: "talk",
+  ward: "read",
+  trophy: "read",
+  dock: "fish",
 };
 
 const STATUS_ICON: Record<AgentStatus, string> = {
@@ -142,6 +171,8 @@ class NpcView {
   private lastTier: string | null = null;
   private finishedTasks = 0;
   private endedHandled = false;
+  /** §13 — how many scratch marks returning subagents have left so far. */
+  private subagentMarks = 0;
 
   constructor(
     private scene: Phaser.Scene,
@@ -149,6 +180,8 @@ class NpcView {
     slot: { x: number; y: number },
     from: { x: number; y: number },
     onClick: () => void,
+    /** §9 — where to leave this agent's trophy once it's gone for good. */
+    private onEnded: (x: number, y: number) => void,
   ) {
     this.home = slot;
     const tier = modelTier(agent.model);
@@ -159,8 +192,10 @@ class NpcView {
       .setOrigin(0.5, 1)
       .setInteractive({ useHandCursor: true });
     this.body.on("pointerdown", onClick);
+    // §8a — a forked twin wears a mark, so it's never mistaken for the
+    // session it branched from (which is still running elsewhere).
     this.nameText = scene.add
-      .text(0, -30, agent.label, {
+      .text(0, -30, agent.forkedFrom ? `⧉ ${agent.label}` : agent.label, {
         fontFamily: "monospace",
         fontSize: "9px",
         color: "#e8e3d0",
@@ -340,8 +375,31 @@ class NpcView {
         duration: 1400,
         onComplete: () => scroll.destroy(),
       });
+      this.dropSubagentMarks(burst);
     }
     this.finishedTasks = finished;
+  }
+
+  /**
+   * §13 — a returning subagent leaves a scratch where it worked, so the
+   * village accumulates a walkable history. Capped: past a handful the party
+   * badge is the record, or a hundred-agent fan-out would bury the ground.
+   */
+  private dropSubagentMarks(burst: number): void {
+    for (let i = 0; i < burst && this.subagentMarks < MAX_SUBAGENT_MARKS; i++) {
+      // Deterministic ring around the NPC's feet — no two marks overlap.
+      const angle = (this.subagentMarks / MAX_SUBAGENT_MARKS) * Math.PI * 2;
+      const mark = this.scene.add
+        .image(
+          this.container.x + Math.cos(angle) * 34,
+          this.container.y + 6 + Math.sin(angle) * 14,
+          "scratch",
+        )
+        .setDepth(3)
+        .setAlpha(0);
+      this.scene.tweens.add({ targets: mark, alpha: 0.8, duration: 500 });
+      this.subagentMarks += 1;
+    }
   }
 
   private applyStatus(status: AgentStatus): void {
@@ -399,7 +457,7 @@ class NpcView {
             onComplete: () => {
               this.container.setVisible(false);
               // §9: leave a walkable trace behind.
-              this.scene.add.image(x, y - 6, "chest").setDepth(5);
+              this.onEnded(x, y - 6);
             },
           });
         }
@@ -428,6 +486,9 @@ export class VillageScene extends Phaser.Scene {
   private cheatKey!: Phaser.Input.Keyboard.Key;
   private npcs = new Map<string, NpcView>();
   private endedMarkers = new Set<string>();
+  // §9c — the trophy each finished agent left, and which have been rewound
+  private trophies = new Map<string, Phaser.GameObjects.Image>();
+  private rewound = new Set<string>();
   private prompt!: Phaser.GameObjects.Text;
   private keysEnabled = true;
   private unsubAgents: (() => void) | null = null;
@@ -442,6 +503,12 @@ export class VillageScene extends Phaser.Scene {
   private playerShadow!: Phaser.GameObjects.Image;
   // §14/§16 gatekeeper + cheats + eggs
   private gatekeeper!: Phaser.GameObjects.Image;
+  /** §9b — the pond's dock; only fishable during a long wait. */
+  private dock!: Phaser.GameObjects.Image;
+  // §14 wards — rune circles per hook, plus the boundary fence
+  private wardCircles = new Map<string, Phaser.GameObjects.Image>();
+  private wardFence: Phaser.GameObjects.Container | null = null;
+  private unsubWards: (() => void) | null = null;
   private wallHits = 0;
   private wallOpened = false;
   private revealed = false;
@@ -501,6 +568,8 @@ export class VillageScene extends Phaser.Scene {
 
     this.unsubAgents = gameStore.sub(agentsAtom, () => this.syncAgents());
     this.syncAgents();
+    this.unsubWards = gameStore.sub(wardsAtom, () => this.syncWards());
+    this.syncWards();
 
     // Unsubscribe on both SHUTDOWN and DESTROY: game.destroy() emits only
     // DESTROY, and a zombie subscription from a dead scene would throw
@@ -509,6 +578,8 @@ export class VillageScene extends Phaser.Scene {
       this.dead = true;
       this.unsubAgents?.();
       this.unsubAgents = null;
+      this.unsubWards?.();
+      this.unsubWards = null;
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubscribe);
     this.events.once(Phaser.Scenes.Events.DESTROY, unsubscribe);
@@ -540,10 +611,51 @@ export class VillageScene extends Phaser.Scene {
       case "guide":
         gameStore.set(uiModeAtom, { mode: "tutorial" });
         break;
+      case "ward":
+        this.readWard(target.wardId);
+        break;
+      case "trophy":
+        this.readTrophy(target.agentId);
+        break;
+      case "dock":
+        // §9b — nothing to wait out means nothing to do here.
+        if (gameStore.get(longWaitAtom)) {
+          gameStore.set(uiModeAtom, { mode: "fishing" });
+        } else {
+          localToast(
+            "info",
+            "🎣 The water is still. Come back when something long is running.",
+          );
+        }
+        break;
       case "npc":
         gameStore.set(uiModeAtom, { mode: "talk", agentId: target.agentId });
         break;
     }
+  }
+
+  /** §14 — a ward states its rule; it isn't something you can negotiate with. */
+  private readWard(wardId: string): void {
+    const ward = gameStore.get(wardsAtom).find((w) => w.id === wardId);
+    if (ward) localToast("info", describeWard(ward));
+  }
+
+  /** §9 — the village's history, legible rather than merely decorative. */
+  private readTrophy(agentId: string): void {
+    const agent = gameStore.get(agentsAtom).find((a) => a.id === agentId);
+    if (!agent) return;
+    const task = agent.task.slice(0, 110).replace(/[.\s]+$/, "");
+    const sentences = [`🏛 ${agent.label} came here to: ${task}.`];
+    if (agent.commits.length > 0) {
+      sentences.push(
+        `Landed ${agent.commits.map((sha) => sha.slice(0, 7)).join(", ")}.`,
+      );
+    }
+    // §9c — a rewound trophy says so; the work happened, and was undone.
+    if (agent.rewound) {
+      sentences.push("Later reverted — the work stands undone.");
+    }
+    localToast("info", sentences.join(" "));
   }
 
   /** §7a — make a world object respond to a direct click/tap. */
@@ -629,6 +741,12 @@ export class VillageScene extends Phaser.Scene {
 
     // §15 — the delightful and slightly arbitrary
     this.add.image(POND.x, POND.y, "pond").setDepth(2);
+    // §9b — the dock only matters while something long is running, so it
+    // stays quiet (and unlit) until there's actually a wait to fill.
+    this.dock = this.clickable(
+      this.add.image(POND.x - 6, POND.y + 4, "dock").setDepth(3),
+      { kind: "dock" },
+    );
     this.clickable(
       this.add.image(POND.x + 40, POND.y - 10, "duck").setDepth(3),
       { kind: "egg", eggId: "duck" },
@@ -792,7 +910,7 @@ export class VillageScene extends Phaser.Scene {
           const spot = this.slots.take(agent.id);
           const slot = slotFor(spot ?? 0);
           if (spot !== null) this.slots.release(agent.id);
-          this.add.image(slot.x, slot.y - 6, "chest").setDepth(5);
+          this.placeTrophy(agent.id, slot.x, slot.y - 6);
         }
         continue;
       }
@@ -815,16 +933,191 @@ export class VillageScene extends Phaser.Scene {
         slotFor(slotIndex),
         { x: ENTRANCE.x, y: ENTRANCE.y - 20 },
         () => this.trigger({ kind: "npc", agentId: agent.id }),
+        (x, y) => this.placeTrophy(agent.id, x, y),
       );
       this.npcs.set(agent.id, npc);
       npc.update(agent);
     }
+    this.syncRewinds(agents);
     this.updateCamp();
 
     // §14 gatekeeper appears when any live agent runs in auto mode.
     this.gatekeeper.setVisible(
       agents.some((a) => a.permissionMode === "auto" && a.status !== "ended"),
     );
+  }
+
+  /**
+   * §14 — draw the repo's hooks onto the world. Each ward is a rune circle at
+   * a fixed spot; if any of them can actually block an action, a ward-line
+   * also rings the village — the invisible fence made visible.
+   */
+  private syncWards(): void {
+    if (this.dead) return;
+    const wards = gameStore.get(wardsAtom).slice(0, WARD_SPOTS.length);
+    const live = new Set(wards.map((ward) => ward.id));
+
+    for (const [id, circle] of this.wardCircles) {
+      if (live.has(id)) continue;
+      circle.destroy();
+      this.wardCircles.delete(id);
+    }
+
+    wards.forEach((ward, index) => {
+      if (this.wardCircles.has(ward.id)) return;
+      const spot = WARD_SPOTS[index];
+      if (!spot) return;
+      this.wardCircles.set(ward.id, this.addRuneCircle(ward, spot));
+    });
+
+    const guarded = wards.some((ward) => ward.blocking);
+    if (guarded && !this.wardFence) this.wardFence = this.buildWardFence();
+    if (!guarded && this.wardFence) {
+      this.wardFence.destroy(true);
+      this.wardFence = null;
+    }
+  }
+
+  private addRuneCircle(
+    ward: Ward,
+    spot: { x: number; y: number },
+  ): Phaser.GameObjects.Image {
+    const circle = this.clickable(
+      this.add
+        .image(spot.x, spot.y, ward.blocking ? "rune-guard" : "rune-watch")
+        .setDepth(2)
+        .setAlpha(0.75),
+      { kind: "ward", wardId: ward.id },
+    );
+    // A slow pulse, so a ward reads as active rather than painted on.
+    this.tweens.add({
+      targets: circle,
+      alpha: { from: 0.45, to: 0.95 },
+      duration: ward.blocking ? 1400 : 2200,
+      yoyo: true,
+      repeat: -1,
+      delay: (spot.x * 3 + spot.y) % 1200,
+      ease: "Sine.easeInOut",
+    });
+    return circle;
+  }
+
+  /** The §14 "invisible fence": posts and a faint line just inside the trees. */
+  private buildWardFence(): Phaser.GameObjects.Container {
+    const inset = 44;
+    const right = WORLD_W - inset;
+    const bottom = WORLD_H - inset;
+    const parts: Phaser.GameObjects.GameObject[] = [];
+
+    const line = this.add.graphics().setDepth(2);
+    line.lineStyle(2, 0xd4a017, 0.28);
+    line.strokeRect(inset, inset, right - inset, bottom - inset);
+    parts.push(line);
+
+    const step = 128;
+    for (let x = inset; x <= right; x += step) {
+      parts.push(this.add.image(x, inset, "ward-post").setDepth(7));
+      parts.push(this.add.image(x, bottom, "ward-post").setDepth(7));
+    }
+    for (let y = inset + step; y < bottom; y += step) {
+      parts.push(this.add.image(inset, y, "ward-post").setDepth(7));
+      parts.push(this.add.image(right, y, "ward-post").setDepth(7));
+    }
+
+    const fence = this.add.container(0, 0, parts);
+    this.tweens.add({
+      targets: fence,
+      alpha: { from: 0.6, to: 1 },
+      duration: 2600,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    return fence;
+  }
+
+  /**
+   * §9 — a finished session leaves a walkable trace in the village: a
+   * monument if it landed real work, a chest if it was a quick errand.
+   */
+  private placeTrophy(agentId: string, x: number, y: number): void {
+    if (this.trophies.has(agentId)) return;
+    const agent = gameStore.get(agentsAtom).find((a) => a.id === agentId);
+    const kind = agent ? trophyKindFor(agent) : "chest";
+    const spot = freeTrophySpot({ x, y }, [...this.trophies.values()]);
+    const trophy = this.clickable(
+      this.add
+        .image(spot.x, spot.y, kind)
+        .setOrigin(0.5, kind === "monument" ? 1 : 0.5)
+        .setDepth(5),
+      { kind: "trophy", agentId },
+    );
+    this.trophies.set(agentId, trophy);
+    // An agent whose work was already reverted before its trophy appeared
+    // (e.g. the page was reloaded) should show up rewound, not pristine.
+    if (this.rewound.has(agentId)) this.showRewound(trophy, false);
+  }
+
+  /**
+   * §9c — a revert rewinds a trophy rather than deleting it: the work having
+   * happened, and having been undone, both stay visible.
+   */
+  private syncRewinds(agents: AgentSnapshot[]): void {
+    for (const agent of agents) {
+      if (!agent.rewound || this.rewound.has(agent.id)) continue;
+      this.rewound.add(agent.id);
+      const trophy = this.trophies.get(agent.id);
+      if (trophy) this.showRewound(trophy, true);
+    }
+  }
+
+  private showRewound(
+    trophy: Phaser.GameObjects.Image,
+    animate: boolean,
+  ): void {
+    const settle = () => {
+      // Left standing but visibly undone — weathered, not erased.
+      trophy.setTint(0x8a8a9a).setAlpha(0.75);
+      this.add
+        .text(trophy.x + 14, trophy.y - 10, "⟲", {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#9ec4f0",
+        })
+        .setOrigin(0.5)
+        .setDepth(6);
+    };
+
+    if (!animate) {
+      settle();
+      return;
+    }
+    // The rewind itself: history spins backwards, then stops where it was.
+    this.tweens.add({
+      targets: trophy,
+      angle: { from: 0, to: -360 },
+      scale: { from: 1, to: 0.75 },
+      duration: 900,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        trophy.setAngle(0);
+        settle();
+      },
+    });
+    const glyph = this.add
+      .text(trophy.x, trophy.y - 14, "⟲", {
+        fontSize: "16px",
+        color: "#9ec4f0",
+      })
+      .setOrigin(0.5)
+      .setDepth(30);
+    this.tweens.add({
+      targets: glyph,
+      y: glyph.y - 24,
+      alpha: 0,
+      duration: 1200,
+      onComplete: () => glyph.destroy(),
+    });
   }
 
   private releasePin(id: string): void {
@@ -864,6 +1157,7 @@ export class VillageScene extends Phaser.Scene {
       slotFor(slotIndex),
       { x: CAMP.x, y: CAMP.y + 26 },
       () => this.trigger({ kind: "npc", agentId: id }),
+      (x, y) => this.placeTrophy(id, x, y),
     );
     this.npcs.set(id, npc);
     npc.update(agent);
@@ -1050,6 +1344,9 @@ export class VillageScene extends Phaser.Scene {
       }
     }
 
+    // §9b — a lit dock is the only hint that there's a wait worth filling.
+    this.dock.setAlpha(gameStore.get(longWaitAtom) ? 1 : 0.55);
+
     this.updateMovement(roaming);
     this.updateInteraction(roaming);
     this.playerShadow.setPosition(this.player.x, this.player.y + 1);
@@ -1106,6 +1403,16 @@ export class VillageScene extends Phaser.Scene {
     if (this.camped.size > 0) consider({ kind: "camp" }, CAMP.x, CAMP.y, 40);
     for (const egg of EGGS) {
       consider({ kind: "egg", eggId: egg.id }, egg.x, egg.y, 34);
+    }
+    for (const [wardId, circle] of this.wardCircles) {
+      consider({ kind: "ward", wardId }, circle.x, circle.y, 30);
+    }
+    for (const [agentId, trophy] of this.trophies) {
+      consider({ kind: "trophy", agentId }, trophy.x, trophy.y, 40);
+    }
+    // §9b — the dock only advertises itself when there's a wait to fill.
+    if (gameStore.get(longWaitAtom)) {
+      consider({ kind: "dock" }, this.dock.x, this.dock.y, 32);
     }
     for (const [id, view] of this.npcs) {
       const agent = gameStore.get(agentsAtom).find((a) => a.id === id);

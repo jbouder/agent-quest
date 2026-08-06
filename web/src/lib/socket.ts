@@ -8,10 +8,12 @@ import {
   gameStore,
   lastSteerAtom,
   playerAtom,
+  raidAtom,
   recentCommitsAtom,
   savedSessionsAtom,
   sideQuestsAtom,
   toastsAtom,
+  wardsAtom,
 } from "@/store/gameAtoms";
 
 let socket: WebSocket | null = null;
@@ -83,6 +85,8 @@ function handleEvent(event: ServerEvent): void {
       safeSet(() => gameStore.set(defaultCwdAtom, event.defaultCwd));
       safeSet(() => gameStore.set(sideQuestsAtom, event.sideQuests));
       safeSet(() => gameStore.set(recentCommitsAtom, event.recentCommits));
+      safeSet(() => gameStore.set(wardsAtom, event.wards));
+      safeSet(() => gameStore.set(raidAtom, event.raid));
       safeSet(() => gameStore.set(demoModeAtom, event.demoMode));
       safeSet(() => gameStore.set(agentsAtom, event.agents));
       // §18 — teach features the first time they actually matter.
@@ -90,6 +94,12 @@ function handleEvent(event: ServerEvent): void {
         hintOnce(
           "permission",
           "❗ An agent awaits your judgment — talk to it, then 🖐 allow or 🛡 deny.",
+        );
+      }
+      if (event.wards.length > 0) {
+        hintOnce(
+          "wards",
+          `⭘ ${event.wards.length} ward${event.wards.length === 1 ? "" : "s"} glow around the village — hooks that hold no matter which agent is acting.`,
         );
       }
       if (

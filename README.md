@@ -106,10 +106,24 @@ Claude Code credentials).
 - Guide NPC by the fountain with a replayable tour, first-time
   contextual hints, and a searchable in-game reference (§18)
 
-**Known gaps (honest ones):** hooks-as-wards and the trophy rewind
-mechanic have no reliable SDK signal yet; live attach to a session
-running in another terminal (Remote Control) has no public API. All
-three are noted in DESIGN.md and wait on upstream support.
+**Backfill — the rest of Phases 3 & 4**
+- Hooks as wards on the world: rune circles per configured hook, read
+  from the settings cascade, plus a boundary ward-line wherever a hook
+  can actually block an action (§14)
+- Rewind: the agent that runs `git commit` owns the commit, and a later
+  revert rewinds that agent's trophy in place instead of erasing it (§9c)
+- Monuments for sessions that landed real work, readable trophies, and
+  scratch marks where subagents finished (§9, §13)
+- The last six §9b quest types: overgrown ruins, traveling merchant,
+  trickster, escort, raid boss (with a boss bar), and the fishing dock
+  that opens only while a long job runs
+
+**Known gap (an honest one):** live attach to a session running in
+another terminal (Remote Control) has no public API — the installed
+agent SDK has no attach export. `forkSession` would give a real control
+handle but leaves the original running, and tailing session messages is
+observation only, which §11 says is not enough to stop an agent. Noted
+in DESIGN.md, waiting on a decision about which trade to make.
 
 ## Layout
 

@@ -3,8 +3,10 @@ import type {
   AgentSnapshot,
   JournalLine,
   PlayerState,
+  Raid,
   SessionSummary,
   SideQuest,
+  Ward,
 } from "@/lib/protocol";
 
 /** Shared store so the Phaser scene (outside React) can read/subscribe too. */
@@ -34,6 +36,31 @@ export const sideQuestsAtom = atom<SideQuest[]>([]);
 
 /** §9d town crier — recent commits. */
 export const recentCommitsAtom = atom<string[]>([]);
+
+/** §14 — hooks configured for the repo, drawn as wards on the world. */
+export const wardsAtom = atom<Ward[]>([]);
+
+/** §9b — the party's shared boss fight, when one has formed. */
+export const raidAtom = atom<Raid | null>(null);
+
+/**
+ * §9b fishing — a long-running background task means a long wait. Derived
+ * rather than stored, so the dock opens and closes with the real work.
+ */
+export const LONG_WAIT_MS = 2 * 60_000;
+
+export const longWaitAtom = atom((get) => {
+  const now = Date.now();
+  for (const agent of get(agentsAtom)) {
+    for (const task of agent.tasks) {
+      if (task.kind !== "background" || task.status !== "running") continue;
+      if (now - task.startedTs >= LONG_WAIT_MS) {
+        return { agentLabel: agent.label, description: task.description };
+      }
+    }
+  }
+  return null;
+});
 
 /** §16 sandbox — the server is running fake agents on fake budget. */
 export const demoModeAtom = atom<boolean>(false);
@@ -90,6 +117,8 @@ export type UiMode =
   | { mode: "board" }
   | { mode: "tavern" }
   | { mode: "scry" }
+  // §9b — the idle dock, open only while a long job is actually running
+  | { mode: "fishing" }
   | { mode: "cheat" }
   // §18 — the guide's walkthrough and the searchable full reference
   | { mode: "tutorial" }
@@ -107,6 +136,12 @@ export type Interactable =
   | { kind: "egg"; eggId: string }
   // §18 — the guide NPC by the fountain
   | { kind: "guide" }
+  // §14 — a rune circle standing for a configured hook
+  | { kind: "ward"; wardId: string }
+  // §9 — the monument or chest a finished session left behind
+  | { kind: "trophy"; agentId: string }
+  // §9b — the pond's dock, fishable while a long job runs
+  | { kind: "dock" }
   | null;
 
 export const nearbyAtom = atom<Interactable>(null);
@@ -125,6 +160,9 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
       uiModeAtom,
       chronicleOpenAtom,
       warpTargetAtom,
+      wardsAtom,
+      raidAtom,
+      longWaitAtom,
     },
     get: () => ({
       agents: gameStore.get(agentsAtom),
